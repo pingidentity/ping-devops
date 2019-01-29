@@ -1,0 +1,14 @@
+# The location MUST be provided
+LOCATION=Denver
+
+# The root user may be provided (Default: cn=directory manager)
+ROOT_USER_DN=cn=administrator
+
+# The replication administration user DN may be provided (Default: admin)
+# ADMIN_USER_NAME=yourReplicationUserHere
+
+# The user base dn may be provided (Default: dc=example,dc=com)
+# USER_BASE_DN=dc=yourCompanyName,dc=com
+
+# The Java heap size may be provided
+# MAX_HEAP_SIZE=384m
