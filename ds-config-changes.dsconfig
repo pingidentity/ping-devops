@@ -5,6 +5,17 @@
 dsconfig set-root-dn-user-prop \
     --user-name "Directory Manager"  \
     --add alternate-bind-dn:cn=administrator
+
+#
+# Turn the audit log (this tiny container is probably just for demo)
+#
 dsconfig set-log-publisher-prop \
     --publisher-name "Data Recovery Log"  \
+    --set enabled:false
+
+#
+# Disable the license warning
+#
+dsconfig set-gauge-prop \
+    --gauge-name "License Expiration (Days)"  \
     --set enabled:false
