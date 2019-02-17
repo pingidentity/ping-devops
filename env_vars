@@ -22,3 +22,8 @@ ADMIN_USER_PASSWORD_FILE=/opt/in/pwd
 # The Java heap size may be provided
 # MAX_HEAP_SIZE=384m
 
+# The server certificate alias to use
+# Customize this if you are providing a keystore in instance/config/keystore (for JKS)
+# or instance/config/keystore.p12 (for PKCS#12)
+# and the server certificate alias is not the default server-cert
+CERTIFICATE_NICKNAME=server-cert

@@ -1,0 +1,6 @@
+#
+# Disable the license warning
+#
+dsconfig set-gauge-prop \
+    --gauge-name "License Expiration (Days)"  \
+    --set enabled:false
