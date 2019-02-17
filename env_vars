@@ -8,13 +8,13 @@ ROOT_USER_DN=cn=administrator
 # This does not necessarily need to be passed in to the container
 # Default to /usr/local/secret to be passed via docker secrets
 # Retrieve from a vault ideally instead of this
-ROOT_USER_PASSWORD_FILE=/opt/in/.pwd
+ROOT_USER_PASSWORD_FILE=/opt/in/pwd
 
 # The replication administration user DN may be provided (Default: admin)
 # ADMIN_USER_NAME=yourReplicationUserHere
 
 # The replication administrator password file
-ADMIN_USER_PASSWORD_FILE=/opt/in/.pwd
+ADMIN_USER_PASSWORD_FILE=/opt/in/pwd
 
 # The user base dn may be provided (Default: dc=example,dc=com)
 # USER_BASE_DN=dc=yourCompanyName,dc=com
