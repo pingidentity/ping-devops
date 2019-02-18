@@ -24,7 +24,8 @@ Extensions will be installed the first time the container start in no guaranteed
 In this diectory, you can place custom scripts that will be executed at specific times during the container startup sequence.
 
 ## instance
-In this directory, you can place any file you would like, following the normal layout of the Ping Identity product that the server-profile is intended for
+In this directory, you can place any file you would like, following the normal layout of the Ping Identity product that the server-profile is intended for.
+
 For example, for PingDirectory:
   - to apply custom schema
     - instance/config/schema/77-microsoft.ldif
