@@ -26,4 +26,12 @@ ADMIN_USER_PASSWORD_FILE=/opt/in/pwd
 # Customize this if you are providing a keystore in instance/config/keystore (for JKS)
 # or instance/config/keystore.p12 (for PKCS#12)
 # and the server certificate alias is not the default server-cert
-CERTIFICATE_NICKNAME=server-cert
+#CERTIFICATE_NICKNAME=server-cert
+
+# The encryption passphase to use
+# This is critical to allow encryption across replicated server and MUST be provided
+ENCRYPTION_PASSWORD_FILE=/opt/in/pwd
+
+# whitespace-separated list of the log files to tail on the container's standard output
+# This is optional and will default to tailing access log
+# TAIL_LOG_FILES="access audit"
