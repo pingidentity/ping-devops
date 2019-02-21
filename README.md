@@ -4,17 +4,22 @@ This repository serves as an example of how configuration can be stored and pass
 ## Top level
 env_vars: environment variable
 
-## config
+## dsconfig
 configuration batches organized in the order in which they should be applied, bearing the .dsconfig extension
 For example:
   - 01-first-batch.dsconfig
   - 02-second-batch.dsconfig
 
 ## data
-LDIF files organized by back-end, bearing the .ldif extension.
+LDIF files organized by back-end, bearing the .ldif extension.  The format that should be used for 
+naming these files is:
+
+   `NN-{back-end name}-{description}.ldif`
+
 The default back-end for PingDirectory is named userRoot, so a good place to start would be for example:
- - 01-userRoot-users.ldif
- - 02-userRoot-groups.ldif
+ - **00-userRoot-dit.ldif** - Contains the entries used to create the skeleton Directory Information Tree (dit)
+ - **10-userRoot-users.ldif** - Contains the user entries
+ - **20-userRoot-groups.ldif** - Contains the group entries
 
 ## extensions
 Server SDK extension files, bearing the .zip extension.
