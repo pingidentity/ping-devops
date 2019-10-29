@@ -1,0 +1,444 @@
+#!/bin/bash
+########################################################################################################################
+#
+# This script is used to manage a Ping Identity DevOps environment for Docker, Docerk Compose and Kubernetes.
+#
+# ------------
+# Installation
+# ------------
+#   brew install ping-devops
+#   brew upgrade ping-devops
+#
+# ------------
+# Requirements
+# ------------
+# The script requires the following tools to be installed:
+#   - openssl
+#   - base64
+#   - kustomize
+#   - kubectl
+#   - envsubst
+#
+# In addition, the assumption is that kubectl is configured to authenticate and apply manifests to the Kubernetes
+# cluster. For EKS clusters, this requires an AWS key and secret with the appropriate IAM policies to be configured and
+# requires that the aws CLI tool and probably the aws-iam-authenticator CLI tool are installed.
+#
+# ----------------------------------------------------------------------------------------------------------------------
+# Variable                      | Purpose
+# ----------------------------------------------------------------------------------------------------------------------
+# PING_IDENTITY_DEVOPS_USER     | A user's email address who has registered with PingIdentity.com and accepted the 
+#                               | EULA and Devlopers program.  To be used to obtain evaluation Ping Identity product
+#                               | licenses.
+#                               |
+# PING_IDENTITY_DEVOPS_KEY      | A key associated with the user's account
+#                               |
+# PING_IDENTITY_DEVOPS_HOME     | Location of Ping Identity DevOps Tools.  Default: ${HOME}/project/devops
+#                               |
+# PING_IDENTITY_DEVOPS_TAG      | Default Docker Image Tag used with DevOps Tools. Default: edge
+#                               |
+# PING_IDENTITY_DEVOPS_DNS_ZONE | DNS Zone used when deploying Kubernetes Ingresses for hostnames
+#                               |
+# PING_IDENTITY_DEVOPS_REGION   | DevOps Cloud location used when deploying Kubernetes resources.  Examples include:
+#                               |   - AWS: us-west-1
+#                               |
+# PING_IDENTITY_K8S_CLUSTER_NAME| Kubernetes Cluster Name used with DevOps Tools.
+#                               |
+# PING_IDENTITY_K8S_NAMESPACE   | Kubernetes Namespace used with DevOps Tools.
+#                               |
+#                               |
+########################################################################################################################
+
+cd "$( dirname "${0}" )"
+THIS="$( basename "${0}" )"
+THIS_DIR=`pwd`
+
+DOT_PINGIDENTITY="${HOME}/.pingidentity"
+DEVOPS_FILE="${DOT_PINGIDENTITY}/devops"
+################################################################################
+# Check for a .pingidentity directory with propertyfile
+################################################################################
+test -d "${DOT_PINGIDENTITY}" || mkdir -p "${DOT_PINGIDENTITY}"
+
+################################################################################
+# Source devops file
+################################################################################
+test -f "${DEVOPS_FILE}" && source "${DEVOPS_FILE}"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+################################################################################
+# Echo message in red color
+################################################################################
+echo_red()
+{
+    echo -e "${RED}$*${NC}"
+}
+
+################################################################################
+# Echo message in green color
+################################################################################
+echo_green()
+{
+    echo -e "${GREEN}$*${NC}"
+}
+
+################################################################################
+# Print usage information
+################################################################################
+function usage()
+{
+cat <<EO_USAGE
+
+################################################################################
+#  Ping Identity DevOps
+#
+#  Documentaion: https://pingidentity-devops.gitbook.io/devops/
+#
+#  GitHub Repos: https://github.com/pingidentity/pingidentity-devops-getting-started
+#                https://github.com/pingidentity/pingidentity-server-profiles
+#
+################################################################################
+
+Usage:
+  ping-devops config      # Helps configure Ping DevOps configuration
+  ping-devops info        # Provides current Ping DevOps configuration
+
+Examples:
+  ping-devops examples            # All examples
+  ping-devops examples docker   
+  ping-devops examples kubernetes   
+  ping-devops examples aws   
+  ping-devops examples azure   
+  ping-devops examples gcloud  
+
+Further help:
+  ping-devops commands
+  ping-devops help [COMMAND]
+  https://docs.ping-devops.sh/
+EO_USAGE
+
+  exit
+}
+
+################################################################################
+# get_value (variable)
+#
+# Get the value of a vaiable, preserving the spaces
+################################################################################
+get_value ()
+{
+    IFS="%%"
+    eval printf '%s' "\${${1}}"
+    unset IFS
+}
+
+################################################################################
+# add_bash_aliases
+#
+# Ensure that the bash_alias file is a part of .bash_profile
+################################################################################
+add_bash_aliases()
+{
+
+    echo "
+################################################################################
+#                         Ping Identity DevOps Alias Files
+################################################################################"
+
+    # Touch the .bash_profile incase it's not setup yet
+    BASH_PROFILE="${HOME}/.bash_profile"
+
+    touch "${BASH_PROFILE}"
+
+    grep "bash_profile_devops" "${BASH_PROFILE}" > /dev/null
+
+    if test "${?}" == "1"; then
+        echo "Let's add helper alias' and functions to your shell.  
+We are assuming you use bash and will add these to your ${BASH_PROFILE}
+"
+
+        echo -n "  OK if we add a 'source bash_profile_devops' command to your ${BASH_PROFILE} (y/n) [y] ? "
+        read answer
+
+        if [ "${answer}" == "" ] || [ "${answer}" == "Y" ] || [ "${answer}" == "y" ]; then
+            echo "
+# Ping Identity DevOps Aliases - Added with setup on `date`
+source ${THIS_DIR}/bash_profile_devops" >> "${BASH_PROFILE}"
+        fi
+    else
+        echo_green "  Great! You already have 'source bash_profile_devops' in your ${BASH_PROFILE}"
+    fi
+
+    grep "sourcePingIdentityFiles" "${BASH_PROFILE}" >/dev/null
+
+    if test "$?" = "1"; then
+        echo -n "  OK if we add a 'sourcePingIdentityFiles' command to your ${BASH_PROFILE} (y/n) [y] ? "
+        read answer
+        if [ "${answer}" == "" ] || [ "${answer}" == "Y" ] || [ "${answer}" == "y" ]; then
+            echo "
+# Source PingIdentity Files Alias - Added with setup on `date`
+sourcePingIdentityFiles" >> "${BASH_PROFILE}"
+        fi
+    else
+        echo_green "  Great! You already have 'sourcePingIdentityFiles' in your ${BASH_PROFILE}"
+    fi
+}
+
+################################################################################
+# devops_add_config (file, variable, default, prompt)
+#
+# Add a config variale to the devops file
+################################################################################
+function devops_add_config()
+{
+  PROPS_FILE="${1}" && shift
+  VAR_TO_SET="${1}" && shift
+  VAR_DEFAULT="${1}" && shift
+  VAR_PROMPT="${*}"
+
+  CURRENT_VALUE=$(get_value ${VAR_TO_SET})
+  test -z "${CURRENT_VALUE}" && CURRENT_VALUE="${VAR_DEFAULT}"
+
+  echo -n "${VAR_PROMPT} [${CURRENT_VALUE}] ? "
+  read answer
+  if test ! -z "${answer}"; then
+    if test "${answer}" = "-"; then
+      eval "unset \${VAR_TO_SET}"
+      echo "${VAR_TO_SET}=" >> ${PROPS_FILE}
+    else
+      eval "export \${VAR_TO_SET}=${answer}"
+      echo "${VAR_TO_SET}=${answer}" >> ${PROPS_FILE}
+    fi
+  else
+    echo "${VAR_TO_SET}=${CURRENT_VALUE}" >> ${PROPS_FILE}
+  fi
+}
+
+################################################################################
+# devops_add_comment (file, message)
+#
+# Add a comment to the devops file
+################################################################################
+function devops_add_comment()
+{
+  _TFILE="${1}" && shift
+  _MSG="${@}"
+
+  echo ${_MSG}
+  echo ${_MSG} >> ${_TFILE}
+}
+
+function devops_setup()
+{
+  echo "
+################################################################################
+#                         Ping Identity Property Files
+################################################################################
+This will create Ping Identity DevOps Property file (${DEVOPS_FILE})
+and they will be used as environment variables for scripts, .yamls, etc...
+################################################################################
+"
+
+  echo "
+################################################################################
+# Ping Identity DevOps Docker Variables
+################################################################################
+# Variables used to assist docker tools and .yaml files during docker 
+# container startups.
+################################################################################
+" | tee -a ${DEVOPS_FILE}
+
+#  echo "
+########################################################################
+# Ping Identity DevOps Docker Variables
+########################################################################
+#" >> ${DEVOPS_FILE}
+  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_USER"               ""      "Ping Identity DevOps User"
+  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_KEY"                ""      "Ping Identity DevOps Key"
+  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_HOME"               "${HOME}/projects/devops" "Location of Ping Identity DevOps repos and tools"
+  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_TAG"                "edge" "Ping Identity DevOps Tag (i.e. edge, 1906)"
+
+  echo "
+################################################################################
+# Ping Identity DevOps Kubernetes Variables
+################################################################################
+# Variables used to assist kubernetes tools and .yaml files during kubernetes
+# deployments
+#
+# These can be set to nothing if Kubernetes deployements or tools are used.
+################################################################################
+" | tee -a ${DEVOPS_FILE}
+
+  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_DNS_ZONE"           "" "DNS Zone used with Kubernetes Ingresses"
+  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_REGION"             "" "Cloud Region used for Kubernetes (i.e. us-east-2"
+  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_CLUSTER_NAME"          "" "Kubernetes Cluster Name used"
+  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_NAMESPACE"             "" "Kubernetes Namespace used"
+
+  sourcePingIdentityFiles
+
+  add_bash_aliases
+}
+
+
+function ping_devops_info()
+{
+    echo "
+################################################################################
+#             Ping Identity DevOps Information
+#             Sourced from ~/.pingidentity/devops
+################################################################################
+#          PING_IDENTITY_DEVOPS_USER: ${PING_IDENTITY_DEVOPS_USER}
+#          PING_IDENTITY_DEVOPS_KEY : ${PING_IDENTITY_DEVOPS_KEY}
+#
+#          PING_IDENTITY_DEVOPS_HOME: ${PING_IDENTITY_DEVOPS_HOME}
+#          PING_IDENTITY_DEVOPS_TAG : ${PING_IDENTITY_DEVOPS_TAG}
+#
+#     PING_IDENTITY_DEVOPS_DNS_ZONE : ${PING_IDENTITY_DEVOPS_DNS_ZONE}
+#       PING_IDENTITY_DEVOPS_REGION : ${PING_IDENTITY_DEVOPS_REGION}
+#
+#    PING_IDENTITY_K8S_CLUSTER_NAME : ${PING_IDENTITY_K8S_CLUSTER_NAME}
+#       PING_IDENTITY_K8S_NAMESPACE : ${PING_IDENTITY_K8S_NAMESPACE}
+################################################################################
+ To configure, run:
+    ping-devops config
+"
+}
+
+function ping_devops_examples()
+{
+    _EXAMPLE="${1}"
+
+    test -z "${_EXAMPLE}" || test "${_EXAMPLE}" == "docker" && echo "
+################################################################################
+#   Docker Examples
+################################################################################
+ To use with 'docker run command'
+     docker run
+        ...
+        --env-file ~/.pingidentity/devops
+        ...
+
+ To use with '.yaml' file (use snippet below)
+     pingdirectory:
+       env_file:
+         - ${HOME}/.pingidentity/devops
+"
+
+    test -z "${_EXAMPLE}" || test "${_EXAMPLE}" == "kubernetes" && echo "
+################################################################################
+#   Kubernetes Examples
+################################################################################
+ To use with a Kubernetes Secret devops-secret
+
+ k create secret generic devops-secret  \\
+   --from-literal=PING_IDENTITY_DEVOPS_USER=${PING_IDENTITY_DEVOPS_USER} \\
+   --from-literal=PING_IDENTITY_DEVOPS_KEY=${PING_IDENTITY_DEVOPS_KEY}
+"
+
+    test -z "${_EXAMPLE}" || test "${_EXAMPLE}" == "aws" && echo "
+################################################################################
+#   AWS EKS Examples
+################################################################################
+"
+
+    test -z "${_EXAMPLE}" || test "${_EXAMPLE}" == "azure" && echo "
+################################################################################
+#   Azure AKS Examples
+################################################################################
+"
+
+    test -z "${_EXAMPLE}" || test "${_EXAMPLE}" == "gcloud" && echo "
+################################################################################
+#   GCloud GKE Examples
+################################################################################
+"
+}
+
+function ping_devops_config()
+{
+    ################################################################################
+    # Check for existance of the devops file and backup to .prev
+    ################################################################################
+    if test -f "${DEVOPS_FILE}"; then
+        mv "${DEVOPS_FILE}" "${DEVOPS_FILE}".prev
+
+        # If the config is broken (i.e. ctrl-c) then restore the previous file
+        trap '
+            echo ""
+            echo "restoring: ${DEVOPS_FILE}"
+            mv "${DEVOPS_FILE}".prev "${DEVOPS_FILE}"
+            exit
+        ' HUP INT PIPE TERM 
+    fi
+
+    echo "
+
+################################################################################
+
+                     Welcome to Ping Identity DevOps!
+
+  We will run through a few config items to make your experiance as easy as 
+  possible.  These include:
+  
+    - Adding bash_profile_devops to your .bash_profile
+    - Setting up your default .pingidentity/devops settings
+    
+  You may run this setup script anytime in the future to change 
+  settings and check for tools.
+  
+  If we have recommendations along the way, we'll provide that
+  also.
+"
+
+    # Source aliases that will be used throughout the setup
+    #source ${THIS_DIR}/bash_profile_devops
+
+    devops_setup
+
+    echo "
+
+################################################################################
+
+  Some great commands to see sample docker or PingOne For Customer commands
+  can be found with:
+
+    dhelp     # DevOps Help
+    khelp     # Kubernetes Help
+
+  Drop us a line, let us know how it's going:
+
+    devops_program@pingidentity.com
+    "
+}
+
+################################################################################
+# main
+################################################################################
+
+test -z "${1}" && usage
+
+while ! test -z "${1}" ; do
+    case "${1}" in
+        config)
+            shift
+            ping_devops_config
+            ;;
+
+        examples)
+            shift
+            ping_devops_examples "${1}"
+            ;;
+
+        info)
+            shift
+            ping_devops_info
+            ;;
+        *)
+            usage
+            ;;
+    esac
+    shift
+done
+
