@@ -116,7 +116,7 @@ Examples:
 Further help:
   ping-devops commands
   ping-devops help [COMMAND]
-  https://docs.ping-devops.sh/
+  https://github.com/pingidentity/ping-devops
 EO_USAGE
 
   exit
@@ -147,28 +147,29 @@ add_bash_aliases()
 #                         Ping Identity DevOps Alias Files
 ################################################################################"
 
-    # Touch the .bash_profile incase it's not setup yet
+    PING_DEVOPS_BASH_PROFILE="/usr/local/etc/bash_profile.ping-devops"
     BASH_PROFILE="${HOME}/.bash_profile"
 
+    # Touch the .bash_profile incase it's not setup yet
     touch "${BASH_PROFILE}"
 
-    grep "bash_profile_devops" "${BASH_PROFILE}" > /dev/null
+    grep "${PING_DEVOPS_BASH_PROFILE}" "${BASH_PROFILE}" > /dev/null
 
     if test "${?}" == "1"; then
         echo "Let's add helper alias' and functions to your shell.  
 We are assuming you use bash and will add these to your ${BASH_PROFILE}
 "
 
-        echo -n "  OK if we add a 'source bash_profile_devops' command to your ${BASH_PROFILE} (y/n) [y] ? "
+        echo -n "  OK if we add a 'source ${PING_DEVOPS_BASH_PROFILE}' command to your ${BASH_PROFILE} (y/n) [y] ? "
         read answer
 
         if [ "${answer}" == "" ] || [ "${answer}" == "Y" ] || [ "${answer}" == "y" ]; then
             echo "
-# Ping Identity DevOps Aliases - Added with setup on `date`
-source ${THIS_DIR}/bash_profile_devops" >> "${BASH_PROFILE}"
+# Ping Identity DevOps Aliases - Added with 'ping-devops config' on `date`
+test -f '${PING_DEVOPS_BASH_PROFILE}' && source '${PING_DEVOPS_BASH_PROFILE}'" >> "${BASH_PROFILE}"
         fi
     else
-        echo_green "  Great! You already have 'source bash_profile_devops' in your ${BASH_PROFILE}"
+        echo_green "  Great! You already have '${PING_DEVOPS_BASH_PROFILE}' in your ${BASH_PROFILE}"
     fi
 
     grep "sourcePingIdentityFiles" "${BASH_PROFILE}" >/dev/null
@@ -178,7 +179,7 @@ source ${THIS_DIR}/bash_profile_devops" >> "${BASH_PROFILE}"
         read answer
         if [ "${answer}" == "" ] || [ "${answer}" == "Y" ] || [ "${answer}" == "y" ]; then
             echo "
-# Source PingIdentity Files Alias - Added with setup on `date`
+# Source PingIdentity Files Alias - Added with 'ping-devops config' on `date`
 sourcePingIdentityFiles" >> "${BASH_PROFILE}"
         fi
     else
@@ -276,8 +277,6 @@ and they will be used as environment variables for scripts, .yamls, etc...
   devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_CLUSTER_NAME"          "" "Kubernetes Cluster Name used"
   devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_NAMESPACE"             "" "Kubernetes Namespace used"
 
-  sourcePingIdentityFiles
-
   add_bash_aliases
 }
 
@@ -289,10 +288,10 @@ function ping_devops_info()
 #             Ping Identity DevOps Information
 #             Sourced from ~/.pingidentity/devops
 ################################################################################
-#          PING_IDENTITY_DEVOPS_USER: ${PING_IDENTITY_DEVOPS_USER}
+#         PING_IDENTITY_DEVOPS_USER : ${PING_IDENTITY_DEVOPS_USER}
 #          PING_IDENTITY_DEVOPS_KEY : ${PING_IDENTITY_DEVOPS_KEY}
 #
-#          PING_IDENTITY_DEVOPS_HOME: ${PING_IDENTITY_DEVOPS_HOME}
+#         PING_IDENTITY_DEVOPS_HOME : ${PING_IDENTITY_DEVOPS_HOME}
 #          PING_IDENTITY_DEVOPS_TAG : ${PING_IDENTITY_DEVOPS_TAG}
 #
 #     PING_IDENTITY_DEVOPS_DNS_ZONE : ${PING_IDENTITY_DEVOPS_DNS_ZONE}
@@ -382,18 +381,10 @@ function ping_devops_config()
   We will run through a few config items to make your experiance as easy as 
   possible.  These include:
   
-    - Adding bash_profile_devops to your .bash_profile
     - Setting up your default .pingidentity/devops settings
-    
-  You may run this setup script anytime in the future to change 
-  settings and check for tools.
-  
-  If we have recommendations along the way, we'll provide that
-  also.
-"
+    - Adding bash_profile.ping-devops to your .bash_profile, if neeeded
 
-    # Source aliases that will be used throughout the setup
-    #source ${THIS_DIR}/bash_profile_devops
+"
 
     devops_setup
 
@@ -401,8 +392,7 @@ function ping_devops_config()
 
 ################################################################################
 
-  Some great commands to see sample docker or PingOne For Customer commands
-  can be found with:
+  Some great commands to see sample docker or kubernetes commands can be found with:
 
     dhelp     # DevOps Help
     khelp     # Kubernetes Help
