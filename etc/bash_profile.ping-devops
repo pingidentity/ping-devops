@@ -295,6 +295,7 @@ cat <<EOHELP
  ${bold}Special${normal}
  ----------------------------------------------------------------------------
  pingdownload - download product or license to ~/Downloads
+ kpf - port-forward in loop (e.g. kpf svc/pingdataconsole 8080:8080)
  ----------------------------------------------------------------------------
 EOHELP
 }
@@ -354,6 +355,13 @@ function knuke() {
   else 
     echo "crisis averted"
   fi
+}
+
+function kpf () {
+  while true
+  do
+    kubectl port-forward ${*}
+  done
 }
 
 function kdelpo() {
