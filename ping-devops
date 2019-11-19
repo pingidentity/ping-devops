@@ -361,15 +361,20 @@ function ping_devops_generate()
     case "${1}" in
         devops-secret)
             echo "
-kubectl create secret generic devops-secret  \\
-   --from-literal=PING_IDENTITY_DEVOPS_USER=${PING_IDENTITY_DEVOPS_USER} \\
-   --from-literal=PING_IDENTITY_DEVOPS_KEY=${PING_IDENTITY_DEVOPS_KEY}"
+apiVersion: v1
+kind: Secret
+metadata:
+  name: devops-secret
+type: Opaque
+data:
+  PING_IDENTITY_DEVOPS_USER: $(echo -n ${PING_IDENTITY_DEVOPS_USER} | base64  | tr -d '\r?\n')
+  PING_IDENTITY_DEVOPS_KEY: $(echo -n ${PING_IDENTITY_DEVOPS_KEY} | base64  | tr -d '\r?\n')
+"
             ;;
 
         tls-secret)
             _domain="${2}"
             test -z "${_domain}" && usage
-            echo "Creating TLS cert and key for ${_domain}"
             CERTS_DIR=$(mktemp -d)
             cd "${CERTS_DIR}"
             DOMAIN="ping-devops.com"
@@ -381,7 +386,6 @@ kubectl create secret generic devops-secret  \\
               -config <(cat /etc/ssl/openssl.cnf; printf "[SAN]\nsubjectAltName=DNS:*.${DOMAIN}") > /dev/null 2>&1
 
             echo "
-echo \"
 apiVersion: v1
 kind: Secret
 type: kubernetes.io/tls
@@ -389,11 +393,7 @@ metadata:
   name: tls-secret
 data:
   tls.crt: $(cat tls.crt | base64 | tr -d '\r?\n')
-  tls.key: $(cat tls.key | base64 | tr -d '\r?\n') \" | kubectl apply -f -
-"
-#kubectl apply -f create secret tls tls-secret  \\
-   #--from-literal=tls.crt=$(cat tls.crt | base64 | tr -d '\r?\n') \\
-   #--from-literal=tls.key=$(cat tls.key | base64 | tr -d '\r?\n')"
+  tls.key: $(cat tls.key | base64 | tr -d '\r?\n') "
 
             cd - > /dev/null
             rm -rf "${CERTS_DIR}"
