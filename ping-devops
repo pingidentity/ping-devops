@@ -102,8 +102,12 @@ cat <<EO_USAGE
 ################################################################################
 
 Usage:
-  ping-devops config      # Helps configure Ping DevOps configuration
-  ping-devops info        # Provides current Ping DevOps configuration
+  ping-devops config                          # Configure Ping DevOps configuration
+  ping-devops info                            # Current Ping DevOps configuration
+
+Generate Kubernetes Secrets:
+  ping-devops generate devops-secret        # Create Ping DevOps secret
+  ping-devops generate tls-secret <domain>  # Generate cert/key
 
 Examples:
   ping-devops examples            # All examples
@@ -329,11 +333,6 @@ function ping_devops_examples()
 ################################################################################
 #   Kubernetes Examples
 ################################################################################
- To use with a Kubernetes Secret devops-secret
-
- k create secret generic devops-secret  \\
-   --from-literal=PING_IDENTITY_DEVOPS_USER=${PING_IDENTITY_DEVOPS_USER} \\
-   --from-literal=PING_IDENTITY_DEVOPS_KEY=${PING_IDENTITY_DEVOPS_KEY}
 "
 
     test -z "${_EXAMPLE}" || test "${_EXAMPLE}" == "aws" && echo "
@@ -354,6 +353,62 @@ function ping_devops_examples()
 ################################################################################
 "
 }
+
+function ping_devops_generate()
+{
+    _secret="${1}"
+
+    case "${1}" in
+        devops-secret)
+            echo "
+kubectl create secret generic devops-secret  \\
+   --from-literal=PING_IDENTITY_DEVOPS_USER=${PING_IDENTITY_DEVOPS_USER} \\
+   --from-literal=PING_IDENTITY_DEVOPS_KEY=${PING_IDENTITY_DEVOPS_KEY}"
+            ;;
+
+        tls-secret)
+            _domain="${2}"
+            test -z "${_domain}" && usage
+            echo "Creating TLS cert and key for ${_domain}"
+            CERTS_DIR=$(mktemp -d)
+            cd "${CERTS_DIR}"
+            DOMAIN="ping-devops.com"
+
+            openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -sha256 \
+              -out tls.crt -keyout tls.key \
+              -subj "/CN=${DOMAIN}" \
+              -reqexts SAN -extensions SAN \
+              -config <(cat /etc/ssl/openssl.cnf; printf "[SAN]\nsubjectAltName=DNS:*.${DOMAIN}") > /dev/null 2>&1
+
+            echo "
+echo \"
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/tls
+metadata:
+  name: tls-secret
+data:
+  tls.crt: $(cat tls.crt | base64 | tr -d '\r?\n')
+  tls.key: $(cat tls.key | base64 | tr -d '\r?\n') \" | kubectl apply -f -
+"
+#kubectl apply -f create secret tls tls-secret  \\
+   #--from-literal=tls.crt=$(cat tls.crt | base64 | tr -d '\r?\n') \\
+   #--from-literal=tls.key=$(cat tls.key | base64 | tr -d '\r?\n')"
+
+            cd - > /dev/null
+            rm -rf "${CERTS_DIR}"
+
+            ;;
+        license-secret)
+            ;;
+
+        *)
+            usage
+            ;;
+    esac
+
+
+} 
 
 function ping_devops_config()
 {
@@ -419,6 +474,14 @@ while ! test -z "${1}" ; do
         examples)
             shift
             ping_devops_examples "${1}"
+            ;;
+
+        generate)
+            shift
+            _secret="${1}"
+            shift
+            _secretParams="${*}"
+            ping_devops_generate "${_secret}" ${_secretParams}
             ;;
 
         info)
