@@ -292,6 +292,12 @@ cat <<EOHELP
  knuke [option] - delete ${bold}all${normal} resources in a namespace, defaults to current namespace
       
 
+ ${bold}Kustomize${normal}
+ ----------------------------------------------------------------------------
+ kustcreate - kustomize build | envsubst | kubectl create 
+ kustapply  - kustomize build | envsubst | kubectl apply 
+ kustdelete - kustomize build | envsubst | kubectl delete 
+
  ${bold}Special${normal}
  ----------------------------------------------------------------------------
  pingdownload - download product or license to ~/Downloads
@@ -356,6 +362,27 @@ function knuke() {
     echo "crisis averted"
   fi
 }
+
+
+function kustfunc() {
+    _kubectlFunc="${1}"
+
+    if ! test -z "${2}"; then
+        _kustomizeBuildTarget="${2}"
+    else
+        _kustomizeBuildTarget="."
+    fi
+
+    _cmd="kustomize build ${_kustomizeBuildTarget} | envsubst | kubectl ${_kubectlFunc} -f -"
+
+    echo "Alias Expansion: ${bold}$_cmd ${normal}"
+
+    eval ${_cmd}
+}
+
+alias kustapply="kustfunc apply"
+alias kustcreate="kustfunc create"
+alias kustdelete="kustfunc delete"
 
 function kpf () {
   while true
