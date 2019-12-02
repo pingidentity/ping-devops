@@ -105,9 +105,10 @@ Usage:
   ping-devops config                          # Configure Ping DevOps configuration
   ping-devops info                            # Current Ping DevOps configuration
 
-Generate Kubernetes Secrets:
-  ping-devops generate devops-secret        # Create Ping DevOps secret
-  ping-devops generate tls-secret <domain>  # Generate cert/key
+Generate Kubernetes/Kustomize Resources:
+  ping-devops generate devops-secret        # Ping DevOps secret
+  ping-devops generate tls-secret <domain>  # TLS Cert/Key
+  ping-devops generate kustomization.yaml   # Skeleton kustomization.yaml
 
 Examples:
   ping-devops examples            # All examples
@@ -402,6 +403,26 @@ data:
         license-secret)
             ;;
 
+        kustomization|kustomization.yaml)
+            echo "Generating a kustomization.yaml for current directory"
+            if test -f ./kustomization.yaml; then
+                echo_red "ERROR: kustomization.yaml already exists"
+            fi
+
+            cat <<EOK >kustomization.yaml
+kind: Kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+
+resources:
+EOK
+            for f in */; do
+              echo "- ${f%/}" >> kustomization.yaml
+            done
+
+            for f in *.yaml; do
+              test "${f}" != "kustomization.yaml" && echo "- ${f%}" >> kustomization.yaml
+            done
+            ;;
         *)
             usage
             ;;
