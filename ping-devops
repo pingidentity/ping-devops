@@ -48,6 +48,7 @@
 #                               |
 ########################################################################################################################
 
+CWD=`pwd` 
 cd "$( dirname "${0}" )"
 THIS="$( basename "${0}" )"
 THIS_DIR=`pwd`
@@ -404,6 +405,7 @@ data:
             ;;
 
         kustomization|kustomization.yaml)
+            cd ${CWD}
             echo "Generating a kustomization.yaml for current directory"
             if test -f ./kustomization.yaml; then
                 echo_red "ERROR: kustomization.yaml already exists"
