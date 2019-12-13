@@ -257,11 +257,7 @@ and they will be used as environment variables for scripts, .yamls, etc...
 ################################################################################
 " | tee -a ${DEVOPS_FILE}
 
-#  echo "
-########################################################################
-# Ping Identity DevOps Docker Variables
-########################################################################
-#" >> ${DEVOPS_FILE}
+  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_ACCEPT_EULA"               "NO" "Do you accept the terms of license (found here: https://www.pingidentity.com/en/legal/subscription-agreement.html) with Ping Identity? (YES/NO)"
   devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_USER"               ""      "Ping Identity DevOps User"
   devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_KEY"                ""      "Ping Identity DevOps Key"
   devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_HOME"               "${HOME}/projects/devops" "Location of Ping Identity DevOps repos and tools"
