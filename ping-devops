@@ -107,9 +107,10 @@ Usage:
   ping-devops info                            # Current Ping DevOps configuration
 
 Generate Kubernetes/Kustomize Resources:
-  ping-devops generate devops-secret        # Ping DevOps secret
-  ping-devops generate tls-secret <domain>  # TLS Cert/Key
-  ping-devops generate kustomization.yaml   # Skeleton kustomization.yaml
+  ping-devops generate devops-secret                    # Ping DevOps secret
+  ping-devops generate tls-secret <domain>              # TLS Cert/Key (i.e. example.com)
+  ping-devops generate ssh-id-secret <ssh id_rsa file>  # SSH ID Key (i.e. ~/.ssh/id_rsa)
+  ping-devops generate kustomization.yaml               # Skeleton kustomization.yaml
 
 Examples:
   ping-devops examples            # All examples
@@ -397,6 +398,19 @@ data:
             rm -rf "${CERTS_DIR}"
 
             ;;
+        ssh-id-secret)
+            _idKey="${2}"
+
+            echo "
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/tls
+metadata:
+  name: ssh-id-key-secret
+data:
+  id_rsa: |
+    $(base64_no_newlines ${_idKey})"
+            ;;
         license-secret)
             ;;
 
@@ -475,6 +489,20 @@ function ping_devops_config()
 
     devops_program@pingidentity.com
     "
+}
+
+########################################################################################################################
+# base64-encode the provided string or file contents and remove any new lines (both line feeds and carriage returns).
+#
+# Arguments
+#   ${1} -> The string to base-64 encode, or a file whose contents to base64-encode.
+########################################################################################################################
+base64_no_newlines() {
+  if test -f "${1}"; then
+    cat "${1}" | base64 | tr -d '\r?\n'
+  else
+    echo -n "${1}" | base64 | tr -d '\r?\n'
+  fi
 }
 
 ################################################################################
