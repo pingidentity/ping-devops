@@ -10,6 +10,13 @@ brew tap pingidentity/devops
 brew install ping-devops
 ```
 
+### Linux
+Copy the ping-devops tool and bash_profile aliases to current directory.
+
+```
+curl -s https://raw.githubusercontent.com/pingidentity/ping-devops/master/install.sh | bash
+```
+
 ## Usage
 
 ### Help

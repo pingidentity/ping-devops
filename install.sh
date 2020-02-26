@@ -46,14 +46,23 @@ echo "
 ################################################################################
                      Welcome to Ping Identity DevOps!
 
-  You have just installed:
+  You have just downloaded:
 
     ${INSTALL_DIR}/ping-devops
-    ${INSTALL_DIR}/base_profile.ping-devops
+    ${INSTALL_DIR}/bash_profile.ping-devops
   
-  It is recommended to copy your 'ping-devops' to a location in your PATH and
-  to source the 'base_profile.ping-devops' in your shell to get all the 
-  goodness from Ping Idnetity DevOps!
+  It is recommended to:
+    1. copy your 'ping-devops' to a location in your PATH (i.e. ~/bin or /usr/local/bin)
+    2. source the 'bash_profile.ping-devops' in your shell to get all the goodness 
+       from Ping Identity DevOps!
+
+  Example:
+    sudo mv ${INSTALL_DIR}/ping-devops /usr/local/bin/.
+    sudo mv ${INSTALL_DIR}/bash_profile.ping-devops /usr/local/etc/.
+    echo 'source /usr/local/etc/bash_profile.ping-devops' >> ~/.bash_profile
+    echo 'sourcePingIdentityFiles' >> ~/.bash_profile
+    . ~/.bash_profile
+    ping-devops
 
   For more information please visit us at:
 
