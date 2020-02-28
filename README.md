@@ -58,4 +58,4 @@ ANY WARRANTIES OR REPRESENTATIONS EXPRESS, IMPLIED OR STATUTORY.
 Please contact devops_program@pingidentity.com for details
 
 ## Copyright
-Copyright © 2019 Ping Identity. All rights reserved.
+Copyright © 2020 Ping Identity. All rights reserved.
