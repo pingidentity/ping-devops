@@ -55,6 +55,12 @@ echo "
     1. copy your 'ping-devops' to a location in your PATH (i.e. ~/bin or /usr/local/bin)
     2. source the 'bash_profile.ping-devops' in your shell to get all the goodness 
        from Ping Identity DevOps!
+    3. Ensure you have additional utilities used by ping-devops:
+          openssl
+          base64
+          kustomize
+          kubectl
+          envsubst
 
   Example:
     sudo mv ${INSTALL_DIR}/ping-devops /usr/local/bin/.
