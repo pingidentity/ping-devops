@@ -3,19 +3,31 @@ Ping Identity DevOps Command-Line Tool
 
 ## Installation
 
-### Homebrew
-
+### Homebrew (on Mac)
+The following utilities will also be installed (if not already) via the brew install:
+* openssl
+* base64
+* kustomize
+* kubectl
+* envsubst
 ```
 brew tap pingidentity/devops
 brew install ping-devops
 ```
 
 ### Linux
-Copy the ping-devops tool and bash_profile aliases to current directory.
+The following install will copy the ping-devops tool and bash_profile aliases to current directory.  After which you should copy then to your preferred location in your path (i.e. ~/bin or /usr/local/bin).
 
 ```
 curl -s https://raw.githubusercontent.com/pingidentity/ping-devops/master/install.sh | bash
 ```
+
+Additionally, you will want to ensure you have the following utilities installed (typically with apk, yum, ...) that are used by ping-devops:
+* openssl
+* base64
+* kustomize
+* kubectl
+* envsubst
 
 ## Usage
 
