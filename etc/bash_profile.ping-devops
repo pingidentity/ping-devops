@@ -240,11 +240,13 @@ cat <<EOP1ENV
 |       PING_IDENTITY_K8S_NAMESPACE : ${PING_IDENTITY_K8S_NAMESPACE}
 +-----------------------------------------------------------------------------------------+
 
- To use with a Kubernetes Secret devops-secret
+ Generating a Kubernetes Secret devops-secret
 
- k create secret generic devops-secret  \\
-   --from-literal=PING_IDENTITY_DEVOPS_USER=${PING_IDENTITY_DEVOPS_USER} \\
-   --from-literal=PING_IDENTITY_DEVOPS_KEY=${PING_IDENTITY_DEVOPS_KEY}
+   ping-devops generate devops-secret
+
+ Generating the tls-secret for your domain '${PING_IDENTITY_DEVOPS_DNS_ZONE}'
+
+   ping-devops generate tls-secret ${PING_IDENTITY_DEVOPS_DNS_ZONE}
 
 +-----------------------------------------------------------------------------------------+
 |             ${bold}Current Kubernetes Context/Namespace (from kubectl config ...)${normal}
