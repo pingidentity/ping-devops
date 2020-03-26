@@ -461,7 +461,7 @@ metadata:
 type: Opaque
 data:
   PING_IDENTITY_DEVOPS_USER: ${_devopsUser}
-  PING_IDENTITY_DEVOPS_USER: ${_devopsKey}
+  PING_IDENTITY_DEVOPS_KEY: ${_devopsKey}
 "
             ;;
 
