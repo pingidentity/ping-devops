@@ -158,7 +158,7 @@ Generate Kubernetes/Kustomize Resource:
   ping-devops generate devops-secret                    # Ping DevOps secret
   ping-devops generate tls-secret <domain>              # TLS Cert/Key (i.e. example.com)
   ping-devops generate ssh-id-secret <ssh id_rsa file>  # SSH ID Key (i.e. ~/.ssh/id_rsa)
-  ping-devops generate licese-secret <license file>     # License file (i.e. pingdirectory.lic)
+  ping-devops generate license-secret <license file>    # License file (i.e. pingdirectory.lic)
   ping-devops generate kustomization.yaml               # Skeleton kustomization.yaml
 
 Generate Ping Identity Server Profile:
