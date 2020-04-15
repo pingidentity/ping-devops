@@ -1121,9 +1121,9 @@ function docker_command()
             test ${_cmd} = "rm"   && run_command "${DOCKER_COMPOSE} ${_docker_compose_options} down"
             ;;
         clean)
-            echo "You are about to clean all the running ping_devops images below..."
+            echo "You are about to clean all the ping_devops images below..."
             echo ""
-            docker container ls --filter name=${_project_name}_*
+            docker container ls -a --filter name=${_project_name}_*
             echo ""
             echo_red "IMPORTANT: This is destructive of all content in these running containers.
 "
