@@ -59,12 +59,14 @@ THIS_DIR=`pwd`
 ################################################################################
 # Utilities used
 ################################################################################
+JQ="jq"
 BASE64="base64"
 OPENSSL="openssl"
 KUSTOMIZE="kustomize"
 KUBECTL="kubectl"
 ENVSUBST="envsubst"
 DOCKER="docker"
+DOCKER_COMPOSE="docker-compose"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -72,6 +74,7 @@ DOCKER="docker"
 DOT_PINGIDENTITY="${HOME}/.pingidentity"
 DEVOPS_FILE="${DOT_PINGIDENTITY}/devops"
 PRINT_DEVOPS_FILE="~/.pingidentity/devops"
+DEVOPS_WORK_DIR="${DOT_PINGIDENTITY}/ping-devops"
 
 ################################################################################
 # Check for a .pingidentity directory with propertyfile
@@ -103,6 +106,7 @@ trap cleanup EXIT
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NORMAL='\033[0m'
+BOLD='\033[1m'
 
 ################################################################################
 # echo_red - Echo message in red color
@@ -130,6 +134,23 @@ echo_error()
 	    echo_red "Error: ${1}"
       echo "-------------------------------------------------------------------------"
     fi
+}
+
+function run_command()
+{
+  CMD="${*}"
+  echo "-------------------------------------------------------------------------"
+  echo -e "Command: ${BOLD}$CMD${NORMAL}"
+  echo "-------------------------------------------------------------------------"
+  $CMD
+}
+
+function check_devops_file()
+{
+  test ! -f ${DEVOPS_FILE} \
+    && echo_red "No ping-devops config found.  Please run:\n" \
+    && echo "  ping-devops config" \
+    && exit
 }
 
 ################################################################################
@@ -166,12 +187,15 @@ Generate Ping Identity Server Profile:
     --current-install    /path/to/current-inst # Default: create an empty profile template)
     --generated-profile  /path/to/gen-profile  # Default: current directory with product name)
 
-Examples:
-  ping-devops examples 
+Running Docker Getting Started Containers:
+  ping-devops docker info                      # Lists all available use-cases/products
+  ping-devops docker info <product>            # Information on user-case/product
+  ping-devops docker start <product>           # Starts services  (i.e. docker-compose up)
+  ping-devops docker stop <product>            # Stops services   (i.e. docker-compose stop)
+  ping-devops docker rm <product>              # Removes services (i.e. docker-compose down)
+  ping-devops docker clean                     # Cleans all ping_devops docker services
 
 Further help:
-  ping-devops commands
-  ping-devops help [COMMAND]
   https://github.com/pingidentity/ping-devops
 EO_USAGE
 
@@ -372,7 +396,7 @@ and they will be used as environment variables for scripts, .yamls, etc...
 # Variables used to assist kubernetes tools and .yaml files during kubernetes
 # deployments
 #
-# These can be set to nothing if Kubernetes deployements or tools are used.
+# These can be set to nothing if no Kubernetes deployments or tools are used.
 ################################################################################
 " | tee -a ${DEVOPS_FILE}
 
@@ -437,7 +461,7 @@ print_examples()
  To use with '.yaml' file (use snippet below)
      pingdirectory:
        env_file:
-         - ${HOME}/.pingidentity/devops
+         - ${PRINT_DEVOPS_FILE}
 "
 
 }
@@ -980,6 +1004,158 @@ TODO GET PA VERSION INFO
 }
 
 ################################################################################
+# docker_command
+#
+# Perform a docker command
+#  - command
+#  - product
+#  - params   (optional)
+################################################################################
+function docker_command()
+{
+    _cmd="${1}"
+    shift
+    _product="${1}"
+    shift
+    _parms="${*}"
+
+    check_devops_file
+    check_for_tool $JQ
+    check_for_tool $DOCKER
+    check_for_tool $DOCKER_COMPOSE
+
+    mkdir -p ${DEVOPS_WORK_DIR}
+    
+    # Get the ping-devops.json file
+    _curl_result=0
+    _ping_devops_url="https://raw.githubusercontent.com/pingidentity/pingidentity-devops-getting-started/master/.ping-devops.json"
+    _ping_devops_json="${DEVOPS_WORK_DIR}/.ping-devops.json"
+    _project_name="ping_devops"
+    
+    curl -sL ${_ping_devops_url} \
+              --output ${_ping_devops_json} \
+              --fail 2>/dev/null
+
+    _curl_result=$?
+
+    if test ${_curl_result} -ne 0; then
+        usage "Unable to get ping-devops.json from '${_ping_devops_url}'"
+    fi
+
+    if test ! -z "${_product}"; then
+        mkdir -p ${DEVOPS_WORK_DIR}/${_product}
+        _base_url=$(cat "${_ping_devops_json}" | jq -r ".baseURL")
+        _usecase_path=$(cat "${_ping_devops_json}" | jq -r ".usecases[] | select ( [.name] == [\"${_product}\"]) | .path")
+        _product_url="${_base_url}/${_usecase_path}"
+        _docker_compose="${DEVOPS_WORK_DIR}/${_product}/docker-compose.yaml"
+        _docker_compose_options="--file ${_docker_compose} --project-name ${_project_name}"
+
+        # Get the product docker-compose.yaml
+        curl -sL ${_product_url}/docker-compose.yaml \
+              --output ${_docker_compose} \
+              --fail 2>/dev/null
+
+        _curl_result=$?
+        
+        # If we can't find a docker-compose.yaml, then we will change the command to info
+        # and provide a message that we can't download info for the product.
+        if test ${_curl_result} -ne 0; then
+            rm -rf ${DEVOPS_WORK_DIR}/${_product}
+            echo_red "Unable to download info for'${_product}'"
+            echo_red "  URL: ${_product_url}/docker-compose.yaml"
+            _cmd="info"
+            _product=""
+        fi
+
+    fi
+
+    case "${_cmd}" in
+        info)
+            if test -z ${_product}; then
+                echo -e "\nAvailable ping-devops docker usecase/products\n\n"
+
+                cat "${_ping_devops_json}" | jq -r "
+                    [.usecases | .[]
+
+                    # | select (.subjects // [] | .[] | [.kind,.name] == [\"User\",\"${EKS_USER}\"])
+                    
+                    # Map column names to data
+                    | {
+                        Name: .name,
+                        Description: .description
+                    }
+                    ]
+
+                    # lowercase keys
+                    # (for predictable sorting, optional)
+                    |  [.[]| with_entries( .key |= ascii_upcase ) ]
+
+                    # print headers
+                    | (.[0] |keys_unsorted | @tsv)
+
+                    # print data
+                      , (.[]|.|map(.) |@tsv)                       # print table
+
+                    "  | tr '\t' '|' | column -t -s '|'
+            else
+                grep "^#-" "${_docker_compose}"
+            fi
+            ;;
+        start)
+            run_command "${DOCKER_COMPOSE} ${_docker_compose_options} pull"
+            run_command "${DOCKER_COMPOSE} ${_docker_compose_options} up --detach"
+
+            echo ""
+            grep "^#-" "${_docker_compose}"
+
+            test "${_cmd}" = "start" && echo "#- Additional Docker Commands
+#-
+#-            List Containers - docker container ls
+#-       Watch Container Logs - docker container logs -f  {container-id}
+#-  Exec Shell Into Container - docker container exec -it {container-id} /bin/sh
+#-------------------------------------------------------------------------------------
+"
+            ;;
+        stop|rm)
+            test ${_cmd} = "stop" && run_command "${DOCKER_COMPOSE} ${_docker_compose_options} stop"
+            test ${_cmd} = "rm"   && run_command "${DOCKER_COMPOSE} ${_docker_compose_options} down"
+            ;;
+        clean)
+            echo "You are about to clean all the running ping_devops images below..."
+            echo ""
+            docker container ls --filter name=${_project_name}_*
+            echo ""
+            echo_red "IMPORTANT: This is destructive of all content in these running containers.
+"
+
+            echo -n "Are you SURE you want to clean these ping_devops images (y/n) [n] ? "
+            read answer
+
+            if [ "${answer}" != "Y" ] && [ "${answer}" != "y" ]; then
+                echo_error "Clean Aborted!"
+                exit
+            fi
+
+            for _prod_option in $(ls -d ${DEVOPS_WORK_DIR}/* 2>/dev/null); do
+
+                _docker_compose_dir="${DEVOPS_WORK_DIR}/$(basename ${_prod_option} )"
+                _docker_compose_options="--file ${_docker_compose_dir}/docker-compose.yaml --project-name ${_project_name}"
+
+                echo "Cleaning up ${_prod_option}"
+                run_command "${DOCKER_COMPOSE} ${_docker_compose_options} down "
+
+                rm -rf "${_docker_compose_dir}"
+            done
+            run_command "${DOCKER} container prune -f"
+            ;;
+        *)
+            usage
+            ;;
+    esac
+    
+}
+
+################################################################################
 ################################################################################
 function devops_config()
 {
@@ -1007,7 +1183,7 @@ function devops_config()
   We will run through a few config items to make your experiance as easy as 
   possible.  These include:
   
-    - Setting up your default .pingidentity/devops settings
+    - Setting up your default '${PRINT_DEVOPS_FILE}' settings
     - Adding bash_profile.ping-devops to your .bash_profile, if neeeded
 
 "
@@ -1076,6 +1252,23 @@ case "${1}" in
         _params="${*}"
 
         generate_profile "${_product}" ${_params}
+        ;;
+
+    docker)
+        shift
+        _docker_cmd="${1}"
+        shift
+        _product="${1}"
+        shift
+        _params="${*}"
+
+        case "${_docker_cmd}" in
+            info|start|stop|rm|clean)
+                docker_command "${_docker_cmd}" "${_product}" ${_params}
+                ;;
+            *) 
+                usage
+        esac
         ;;
 
     info)
