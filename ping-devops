@@ -57,6 +57,11 @@ THIS="$( basename "${0}" )"
 THIS_DIR=`pwd`
 
 ################################################################################
+# Version Info
+################################################################################
+VERSION="0.5.0"
+
+################################################################################
 # Utilities used
 ################################################################################
 JQ="jq"
@@ -145,10 +150,30 @@ function run_command()
   $CMD
 }
 
+################################################################################
+# check_devops_file - Verify that the devops_file is found
+################################################################################
 function check_devops_file()
 {
   test ! -f ${DEVOPS_FILE} \
     && echo_red "No ping-devops config found.  Please run:\n" \
+    && echo "  ping-devops config" \
+    && exit
+}
+
+################################################################################
+# check_variables - Verify that certain variables are set
+################################################################################
+function check_variables()
+{
+  for _var in ${*}; do
+    test -z $(get_value ${_var}) \
+      && echo_red "Variable is not set: ${_var}" \
+      && _var_check_fails=true
+  done
+
+  test ${_var_check_fails} \
+    && echo_red "\nPlease ensure these are set.  Please run:\n" \
     && echo "  ping-devops config" \
     && exit
 }
@@ -162,7 +187,7 @@ function usage()
 cat <<EO_USAGE
 
 ################################################################################
-#  Ping Identity DevOps
+#  Ping Identity DevOps (version $VERSION)
 #
 #  Documentaion: https://pingidentity-devops.gitbook.io/devops/
 #
@@ -172,8 +197,9 @@ cat <<EO_USAGE
 ################################################################################
 
 Usage:
-  ping-devops config                          # Configure Ping DevOps configuration
-  ping-devops info                            # Current Ping DevOps configuration
+  ping-devops config                          # Configure Ping DevOps
+  ping-devops info [-v]                       # Config Information
+  ping-devops version                         # Version Details and Check
 
 Generate Kubernetes/Kustomize Resource:
   ping-devops generate devops-secret                    # Ping DevOps secret
@@ -316,8 +342,11 @@ function devops_add_config()
   CURRENT_VALUE=$(get_value ${VAR_TO_SET})
   test -z "${CURRENT_VALUE}" && CURRENT_VALUE="${VAR_DEFAULT}"
 
-  echo -n "${VAR_PROMPT} [${CURRENT_VALUE}] ? "
+  echo "${VAR_PROMPT}"
+  echo -ne "    [${GREEN}${CURRENT_VALUE}${NORMAL}] ? "
+  #echo -ne "${VAR_PROMPT} [${GREEN}${CURRENT_VALUE}${NORMAL}] ? "
   read answer
+  echo ""
   if test ! -z "${answer}"; then
     if test "${answer}" = "-"; then
       if test -z "${VAR_TO_SET}"; then
@@ -416,28 +445,72 @@ and they will be used as environment variables for scripts, .yamls, etc...
 ################################################################################
 ping_devops_info()
 {
+    _show="${1}"
+
+    if test "${_show}" = "-v"; then
+        _display_key="${PING_IDENTITY_DEVOPS_KEY}"
+    else
+        _display_key="*** REDACTED *** (use -v to display)"
+    fi
+
     echo "
 ################################################################################
-#             Ping Identity DevOps Information
+#             Ping Identity DevOps Information (version $VERSION)
 #             Sourced from ${PRINT_DEVOPS_FILE}
 ################################################################################
-#         PING_IDENTITY_DEVOPS_USER : ${PING_IDENTITY_DEVOPS_USER}
-#          PING_IDENTITY_DEVOPS_KEY : ${PING_IDENTITY_DEVOPS_KEY}
+#     PING_IDENTITY_DEVOPS_USER      : ${PING_IDENTITY_DEVOPS_USER}
+#     PING_IDENTITY_DEVOPS_KEY       : ${_display_key}
 #
-#         PING_IDENTITY_DEVOPS_HOME : ${PING_IDENTITY_DEVOPS_HOME}
-#     PING_IDENTITY_DEVOPS_REGISTRY : ${PING_IDENTITY_DEVOPS_REGISTRY}
-#          PING_IDENTITY_DEVOPS_TAG : ${PING_IDENTITY_DEVOPS_TAG}
+#     PING_IDENTITY_DEVOPS_HOME      : ${PING_IDENTITY_DEVOPS_HOME}
+#     PING_IDENTITY_DEVOPS_REGISTRY  : ${PING_IDENTITY_DEVOPS_REGISTRY}
+#     PING_IDENTITY_DEVOPS_TAG       : ${PING_IDENTITY_DEVOPS_TAG}
 #
-#     PING_IDENTITY_DEVOPS_DNS_ZONE : ${PING_IDENTITY_DEVOPS_DNS_ZONE}
-#       PING_IDENTITY_DEVOPS_REGION : ${PING_IDENTITY_DEVOPS_REGION}
+#     PING_IDENTITY_DEVOPS_DNS_ZONE  : ${PING_IDENTITY_DEVOPS_DNS_ZONE}
+#     PING_IDENTITY_DEVOPS_REGION    : ${PING_IDENTITY_DEVOPS_REGION}
 #
-#    PING_IDENTITY_K8S_CLUSTER_NAME : ${PING_IDENTITY_K8S_CLUSTER_NAME}
-#       PING_IDENTITY_K8S_NAMESPACE : ${PING_IDENTITY_K8S_NAMESPACE}
+#     PING_IDENTITY_K8S_CLUSTER_NAME : ${PING_IDENTITY_K8S_CLUSTER_NAME}
+#     PING_IDENTITY_K8S_NAMESPACE    : ${PING_IDENTITY_K8S_NAMESPACE}
+#
+#     PING_IDENTITY_ACCEPT_EULA      : ${PING_IDENTITY_ACCEPT_EULA}
 ################################################################################
- To configure, run:
+ To change config, run: 
     ping-devops config
 "
 }
+
+################################################################################
+# ping_devops_version ()
+#
+# Prints tool version info
+################################################################################
+ping_devops_version()
+{
+    # Looks for the URL and pulls out the version.  Example should be:
+    #
+    #      url "https://github.com/pingidentity/ping-devops/archive/v0.5.0.tar.gz"
+    #
+    _latest_tool_version=$(curl -sL -H "User-Agent: ping-devops" https://bit.ly/ping-devops-version \
+      |  grep -e '^  url ".*"$' \
+      |  sed "s/.*archive\/v\(.*\)\.tar.*/\1/")
+
+    _curl_result=$?
+
+    test ${_curl_result} -ne 0 && _latest_tool_version="UNKNOWN"
+    
+    if test "${_latest_tool_version}" = "${VERSION}" ||
+       test "${_latest_tool_version}" = "UNKNOWN"; then
+        _version_msg="${GREEN}${VERSION}${NORMAL} (no update required)"
+    else
+        _version_msg="${RED}${VERSION}${NORMAL} (updated version ${_latest_tool_version} is available)
+
+to update, you can use:
+  macosx : brew reinstall ping-devops
+  linux  : curl -L https://bit.ly/ping-devops-install | bash"
+    fi
+
+    echo -e "ping-devops version ${_version_msg}"
+}
+
 
 ################################################################################
 # print_examples
@@ -1028,11 +1101,20 @@ function docker_command()
     
     # Get the ping-devops.json file
     _curl_result=0
-    _ping_devops_url="https://raw.githubusercontent.com/pingidentity/pingidentity-devops-getting-started/master/.ping-devops.json"
+    _ping_devops_url="https://bit.ly/ping-devops-json"
     _ping_devops_json="${DEVOPS_WORK_DIR}/.ping-devops.json"
     _project_name="ping_devops"
     
-    curl -sL ${_ping_devops_url} \
+    # Ensure that certain variables are set found in environment/config file 
+    # before continuing
+    check_variables \
+      PING_IDENTITY_ACCEPT_EULA \
+      PING_IDENTITY_DEVOPS_USER \
+      PING_IDENTITY_DEVOPS_KEY \
+      PING_IDENTITY_DEVOPS_REGISTRY \
+      PING_IDENTITY_DEVOPS_TAG
+
+    curl -sL -H "User-Agent: ping-devops" ${_ping_devops_url} \
               --output ${_ping_devops_json} \
               --fail 2>/dev/null
 
@@ -1185,10 +1267,41 @@ function devops_config()
   
     - Setting up your default '${PRINT_DEVOPS_FILE}' settings
     - Adding bash_profile.ping-devops to your .bash_profile, if neeeded
-
 "
 
-    devops_setup
+    echo "
+################################################################################
+#              Ping Identity DevOps Docker Variables
+################################################################################
+# Variables used to assist docker tools and .yaml files during docker 
+# container startups.
+################################################################################
+" | tee -a ${DEVOPS_FILE}
+
+    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_ACCEPT_EULA"               "NO" "Do you accept the terms of license (found here: https://www.pingidentity.com/en/legal/subscription-agreement.html) with Ping Identity? (YES/NO)"
+    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_USER"               ""                        "Ping Identity DevOps User (request here: https://bit.ly/ping-devops-request)"
+    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_KEY"                ""                        "Ping Identity DevOps Key"
+    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_HOME"               "${HOME}/projects/devops" "Location of Ping Identity DevOps repos and tools"
+    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_REGISTRY"           "docker.io/pingidentity"  "Ping Identity DevOps Registry (recommend default: docker.io/pingidentity)"
+    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_TAG"                "edge"                    "Ping Identity DevOps Tag (recommend default: edge)"
+
+    echo "
+################################################################################
+#              Ping Identity DevOps Kubernetes Variables
+################################################################################
+# Variables used to assist kubernetes tools and .yaml files during kubernetes
+# deployments
+#
+# These can be set to nothing if no Kubernetes deployments or tools are used.
+################################################################################
+" | tee -a ${DEVOPS_FILE}
+
+    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_DNS_ZONE"           "" "DNS Zone used with Kubernetes Ingresses"
+    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_REGION"             "" "Cloud Region used for Kubernetes (i.e. us-east-2"
+    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_CLUSTER_NAME"          "" "Kubernetes Cluster Name used"
+    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_NAMESPACE"             "" "Kubernetes Namespace used"
+
+    add_bash_aliases
 
     echo "
 
@@ -1273,7 +1386,15 @@ case "${1}" in
 
     info)
         shift
-        ping_devops_info
+        _params="${*}"
+
+        ping_devops_info ${_params}
+        ;;
+    version)
+        shift
+        _params="${*}"
+
+        ping_devops_version ${_params}
         ;;
     *)
         usage
