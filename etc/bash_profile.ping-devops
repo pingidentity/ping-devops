@@ -314,15 +314,33 @@ EOHELP
 
 ## kubernetes
 function k () {
+   _kubectlParams="$*"
    _kubeCTX=$(kubectl config current-context)
    _kubeNS=$(kubectl config view --minify --output 'jsonpath={..namespace}')
+   _kubeNShelp=""
 
-   echo "Alias Expansion: ${bold}kubectl $* -n ${_kubeNS}${normal}"
+   test ${_kubeNS} = "default" && _kubeNShelp=" (to set, use kubens {namespace})"
+
+   while true; do
+      test -z "$1" && break
+      case "$1" in
+         -n|--namespace)
+            shift
+            _kubeNS="$1"
+            ;;
+         -A)
+            _kubeNS="ALL Namespaces"
+            ;;
+      esac
+      shift
+   done
+
+   echo "Alias Expansion: ${bold}kubectl ${_kubectlParams}${normal}"
    echo "    k8s Context: ${bold}${_kubeCTX}${normal}"
-   echo "  k8s Namespace: ${bold}${_kubeNS}${normal}"
+   echo "  k8s Namespace: ${bold}${_kubeNS}${normal}${_kubeNShelp}"
    echo "--------------------------------------"
 
-   kubectl $* -n ${_kubeNS}
+   kubectl $_kubectlParams
 }
 
 ## kubernetes general aliases
@@ -342,7 +360,7 @@ alias kds="kd services"
 alias kdn="kd nodes"
 
 ## kubernetes pod aliases
-alias kpe="k exec -it"
+alias kpe="k exec -it "
 alias kpl="k get pods"
 alias klogs="k logs -f "
 

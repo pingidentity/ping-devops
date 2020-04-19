@@ -56,10 +56,22 @@ cd "$( dirname "${0}" )"
 THIS="$( basename "${0}" )"
 THIS_DIR=`pwd`
 
+PING_DEVOPS_STANDARD_VARIABLES="
+  PING_IDENTITY_DEVOPS_USER
+  PING_IDENTITY_DEVOPS_KEY
+  PING_IDENTITY_DEVOPS_HOME
+  PING_IDENTITY_DEVOPS_REGISTRY
+  PING_IDENTITY_DEVOPS_TAG
+  PING_IDENTITY_DEVOPS_DNS_ZONE
+  PING_IDENTITY_DEVOPS_REGION
+  PING_IDENTITY_K8S_CLUSTER_NAME
+  PING_IDENTITY_K8S_NAMESPACE
+  PING_IDENTITY_ACCEPT_EULA"
+
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.5.2"
+VERSION="0.5.3"
 
 ################################################################################
 # Utilities used
@@ -327,6 +339,29 @@ sourcePingIdentityFiles" >> "${BASH_PROFILE}"
 }
 
 ################################################################################
+# get_custom_variables ()
+#
+# Obtain a list of custom variablees
+################################################################################
+function get_custom_variables()
+{
+    grep -v "^#" ${DEVOPS_FILE} | \
+    while read _line
+    do
+        test -z "${_line}" && continue
+        _name="${_line%%=*}"
+        _val="${_line#*=}"
+
+        echo $PING_DEVOPS_STANDARD_VARIABLES | grep ${_name} >/dev/null
+        _grepRC=$?
+        
+        if test ${_grepRC} -ne 0; then
+            echo "${_name}"
+        fi
+    done
+}
+
+################################################################################
 # devops_add_config (file, variable, default, prompt)
 #
 # Add a config variale to the devops file, using the prompt sent, and defaulting
@@ -353,7 +388,13 @@ function devops_add_config()
         echo -n "" >> ${PROPS_FILE}
       else
         eval "unset \${VAR_TO_SET}"
-        echo "${VAR_TO_SET}=" >> ${PROPS_FILE}
+
+        # If the variable being uset, is a standard variable, then echo an
+        # empty value in the property file, otherwise, lose it from new
+        # property file
+        echo $PING_DEVOPS_STANDARD_VARIABLES | grep ${VAR_TO_SET} >/dev/null
+
+        test $? -eq 0 && echo "${VAR_TO_SET}=" >> ${PROPS_FILE}
       fi
     else
       if test -z "${VAR_TO_SET}"; then
@@ -373,6 +414,77 @@ function devops_add_config()
 }
 
 ################################################################################
+# devops_add_config_customize (file)
+#
+# Add a config variale to the devops file, using the prompt sent, and defaulting
+# if no value is provided.
+################################################################################
+function devops_add_config_custom()
+{
+  PROPS_FILE="${1}" && shift
+  _custom_variables="${*}"
+
+  echo -e "\nSet existing custom variables:
+  [enter]     to accept current value
+  [-]         to unset the value 
+  new value   to change value
+  "
+
+  for _varName in ${_custom_variables}; do
+      devops_add_config ${PROPS_FILE} ${_varName}  ""  "Set Custom Variable '${_varName}'"
+  done
+
+  echo -e "\nAdd additional variables:
+  [enter]     to end adding additional variables
+  NAME=VALUE  to add that variable with setting
+  "
+  
+  while true
+  do
+      echo -ne "Enter a new NAME=VALUE [enter to end] : "
+
+      read answer
+
+      test -z "${answer}" && break
+
+      echo "$answer" >> ${PROPS_FILE}
+  done
+
+
+  # CURRENT_VALUE=$(get_value ${VAR_TO_SET})
+  # test -z "${CURRENT_VALUE}" && CURRENT_VALUE="${VAR_DEFAULT}"
+
+  # echo "${VAR_PROMPT}"
+  # echo -ne "    [${GREEN}${CURRENT_VALUE}${NORMAL}] ? "
+  # #echo -ne "${VAR_PROMPT} [${GREEN}${CURRENT_VALUE}${NORMAL}] ? "
+  # read answer
+  # echo ""
+  # if test ! -z "${answer}"; then
+  #   if test "${answer}" = "-"; then
+  #     if test -z "${VAR_TO_SET}"; then
+  #       echo -n "" >> ${PROPS_FILE}
+  #     else
+  #       eval "unset \${VAR_TO_SET}"
+  #       echo "${VAR_TO_SET}=" >> ${PROPS_FILE}
+  #     fi
+  #   else
+  #     if test -z "${VAR_TO_SET}"; then
+  #       echo -n "${answer}" >> ${PROPS_FILE}
+  #     else
+  #       eval "export \${VAR_TO_SET}=${answer}"
+  #       echo "${VAR_TO_SET}=${answer}" >> ${PROPS_FILE}
+  #     fi
+  #   fi
+  # else
+  #   if test -z "${VAR_TO_SET}"; then
+  #       echo -n "${CURRENT_VALUE}" >> ${PROPS_FILE}
+  #   else
+  #       echo "${VAR_TO_SET}=${CURRENT_VALUE}" >> ${PROPS_FILE}
+  #   fi
+  # fi
+}
+
+################################################################################
 # devops_add_comment (file, comment)
 #
 # Add a comment to the devops file
@@ -386,57 +498,12 @@ function devops_add_comment()
   echo ${_MSG} >> ${_TFILE}
 }
 
-################################################################################
-# devops_setup ()
-#
-# Performs the interactive steps of the configuration
-################################################################################
-function devops_setup()
+echo_info_variable()
 {
-  echo "
-################################################################################
-#                         Ping Identity Property Files
-################################################################################
-This will create Ping Identity DevOps Property file (${DEVOPS_FILE})
-and they will be used as environment variables for scripts, .yamls, etc...
-################################################################################
-"
+  _varToEcho="${1}"
 
-  echo "
-################################################################################
-# Ping Identity DevOps Docker Variables
-################################################################################
-# Variables used to assist docker tools and .yaml files during docker 
-# container startups.
-################################################################################
-" | tee -a ${DEVOPS_FILE}
-
-  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_ACCEPT_EULA"               "NO" "Do you accept the terms of license (found here: https://www.pingidentity.com/en/legal/subscription-agreement.html) with Ping Identity? (YES/NO)"
-  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_USER"               ""                        "Ping Identity DevOps User"
-  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_KEY"                ""                        "Ping Identity DevOps Key"
-  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_HOME"               "${HOME}/projects/devops" "Location of Ping Identity DevOps repos and tools"
-  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_REGISTRY"           "docker.io/pingidentity"  "Ping Identity DevOps Registry"
-  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_TAG"                "edge"                    "Ping Identity DevOps Tag (i.e. edge, 1906)"
-
-  echo "
-################################################################################
-# Ping Identity DevOps Kubernetes Variables
-################################################################################
-# Variables used to assist kubernetes tools and .yaml files during kubernetes
-# deployments
-#
-# These can be set to nothing if no Kubernetes deployments or tools are used.
-################################################################################
-" | tee -a ${DEVOPS_FILE}
-
-  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_DNS_ZONE"           "" "DNS Zone used with Kubernetes Ingresses"
-  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_REGION"             "" "Cloud Region used for Kubernetes (i.e. us-east-2"
-  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_CLUSTER_NAME"          "" "Kubernetes Cluster Name used"
-  devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_NAMESPACE"             "" "Kubernetes Namespace used"
-
-  add_bash_aliases
+  printf "#     %-30s : %s\n" "${_varToEcho}" $(get_value ${_varToEcho})
 }
-
 
 ################################################################################
 # ping_devops_info ()
@@ -457,25 +524,42 @@ ping_devops_info()
 ################################################################################
 #             Ping Identity DevOps Information (version $VERSION)
 #             Sourced from ${PRINT_DEVOPS_FILE}
-################################################################################
-#     PING_IDENTITY_DEVOPS_USER      : ${PING_IDENTITY_DEVOPS_USER}
-#     PING_IDENTITY_DEVOPS_KEY       : ${_display_key}
-#
-#     PING_IDENTITY_DEVOPS_HOME      : ${PING_IDENTITY_DEVOPS_HOME}
-#     PING_IDENTITY_DEVOPS_REGISTRY  : ${PING_IDENTITY_DEVOPS_REGISTRY}
-#     PING_IDENTITY_DEVOPS_TAG       : ${PING_IDENTITY_DEVOPS_TAG}
-#
-#     PING_IDENTITY_DEVOPS_DNS_ZONE  : ${PING_IDENTITY_DEVOPS_DNS_ZONE}
-#     PING_IDENTITY_DEVOPS_REGION    : ${PING_IDENTITY_DEVOPS_REGION}
-#
-#     PING_IDENTITY_K8S_CLUSTER_NAME : ${PING_IDENTITY_K8S_CLUSTER_NAME}
-#     PING_IDENTITY_K8S_NAMESPACE    : ${PING_IDENTITY_K8S_NAMESPACE}
-#
-#     PING_IDENTITY_ACCEPT_EULA      : ${PING_IDENTITY_ACCEPT_EULA}
-################################################################################
+################################################################################"
+echo_info_variable PING_IDENTITY_DEVOPS_USER
+echo_info_variable PING_IDENTITY_DEVOPS_KEY
+echo "#"
+echo_info_variable PING_IDENTITY_DEVOPS_HOME
+echo_info_variable PING_IDENTITY_DEVOPS_REGISTRY
+echo "#"
+echo_info_variable PING_IDENTITY_DEVOPS_TAG
+echo_info_variable PING_IDENTITY_DEVOPS_DNS_ZONE
+echo_info_variable PING_IDENTITY_DEVOPS_REGION
+echo "#"
+echo_info_variable PING_IDENTITY_K8S_CLUSTER_NAME
+echo_info_variable PING_IDENTITY_K8S_NAMESPACE
+echo "#"
+echo_info_variable PING_IDENTITY_ACCEPT_EULA
+
+
+_listOfCustom_Variables=$(get_custom_variables)
+
+if test ! -z "$_listOfCustom_Variables"; then
+  echo "################################################################################
+#             Custom Variables
+################################################################################"
+
+  for _custVar in $_listOfCustom_Variables
+  do
+      echo_info_variable "${_custVar}"
+  done
+fi
+
+echo "################################################################################
  To change config, run: 
     ping-devops config
 "
+
+
 }
 
 ################################################################################
@@ -1241,6 +1325,13 @@ function docker_command()
 ################################################################################
 function devops_config()
 {
+
+    ################################################################################
+    # Get all the custom variables from the devops file before we backup
+    ################################################################################
+    _custom_variables=$(get_custom_variables)
+
+            echo "Custom Variables=${_custom_variables}"
     ################################################################################
     # Check for existance of the devops file and backup to .prev
     ################################################################################
@@ -1300,6 +1391,29 @@ function devops_config()
     devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_REGION"             "" "Cloud Region used for Kubernetes (i.e. us-east-2"
     devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_CLUSTER_NAME"          "" "Kubernetes Cluster Name used"
     devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_NAMESPACE"             "" "Kubernetes Namespace used"
+
+    echo "
+################################################################################
+#              Ping Identity DevOps Customized Variables
+################################################################################
+# Additional variables that you would like to send to containers via 
+# docker-compose.yaml and kubernetes .yaml files.
+#
+# Examples include:
+#     PING_CONTAINER_PRIVILEGED=false
+#     PING_CONTAINER_UID=12345
+#     PING_CONTAINER_GID=9876
+#     LDAP_PORT=1389
+#     LDAPS_PORT=1636
+#     HTTPS_PORT=1443
+#     JMX_PORT=1689
+#     PING_IDENTITY_PASSWORD=2FederateM0re
+#
+# These are often set to nothing, unless you are using advanced features
+################################################################################
+" | tee -a ${DEVOPS_FILE}
+
+    devops_add_config_custom "${DEVOPS_FILE}" "${_custom_variables}"   
 
     add_bash_aliases
 
