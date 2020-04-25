@@ -56,6 +56,9 @@ echo "
     2. source the 'bash_profile.ping-devops' in your shell to get all the goodness 
        from Ping Identity DevOps!
     3. Ensure you have additional utilities used by ping-devops:
+          jq
+          docker
+          docker-compose
           openssl
           base64
           kustomize
