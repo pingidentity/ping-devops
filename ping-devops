@@ -1324,6 +1324,8 @@ function print_orchestration_usecase()
   else
       grep "^#-" "${_usecase_file}"
   fi
+
+  echo ""
 }
 
 
