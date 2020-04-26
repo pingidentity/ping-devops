@@ -52,7 +52,7 @@ PING_DEVOPS_STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.5.4"
+VERSION="0.5.5"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -612,7 +612,7 @@ function print_update_information
 {
   echo "
 to update, you can use:
-  macosx : brew reinstall ping-devops
+  macosx : brew upgrade ping-devops
   linux  : curl -L https://bit.ly/ping-devops-install | bash"
 }
 ################################################################################
@@ -638,11 +638,10 @@ ping_devops_version()
        test "${_latest_tool_version}" = "UNKNOWN"; then
         _version_msg="${GREEN}${VERSION}${NORMAL} (no update required)"
     else
-        _version_msg="${RED}${VERSION}${NORMAL} (updated version ${_latest_tool_version} is available)"
+        _version_msg="${RED}${VERSION}${NORMAL} (updated version ${_latest_tool_version} is available)\n$(print_update_information)"
     fi
 
     echo -e "ping-devops version ${_version_msg}"
-    print_update_information
 }
 
 ################################################################################
@@ -1255,17 +1254,17 @@ $(${_serverRoot}/bin/status -V)
 function get_ping_devops_json ()
 {
     # Get the ping-devops.json file
-    # _curl_result=0
+    _curl_result=0
     
-    # curl -sL -H "User-Agent: ping-devops" ${PING_DEVOPS_URL} \
-    #           --output ${PING_DEVOPS_JSON} \
-    #           --fail 2>/dev/null
+    curl -sL -H "User-Agent: ping-devops" ${PING_DEVOPS_URL} \
+              --output ${PING_DEVOPS_JSON} \
+              --fail 2>/dev/null
 
-    # _curl_result=$?
+    _curl_result=$?
 
-    # if test ${_curl_result} -ne 0; then
-    #     usage "Unable to get ping-devops.json from '${PING_DEVOPS_URL}'"
-    # fi
+    if test ${_curl_result} -ne 0; then
+        usage "Unable to get ping-devops.json from '${PING_DEVOPS_URL}'"
+    fi
 
     _json_version=$(cat ${PING_DEVOPS_JSON} | jq -r '.minVersion')
 
