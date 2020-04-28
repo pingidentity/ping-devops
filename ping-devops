@@ -23,6 +23,7 @@ KUBENS="kubens"
 ENVSUBST="envsubst"
 DOCKER="docker"
 DOCKER_COMPOSE="docker-compose"
+CURL="curl -sL "
 #
 # In addition, the assumption is that kubectl is configured to authenticate and apply manifests to the Kubernetes
 # cluster. For EKS clusters, this requires an AWS key and secret with the appropriate IAM policies to be configured and
@@ -52,7 +53,7 @@ PING_DEVOPS_STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.5.5"
+VERSION="0.5.6"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -66,6 +67,7 @@ test -d "${DEVOPS_WORK_DIR}" || mkdir -p "${DEVOPS_WORK_DIR}"
 ################################################################################
 # Ping DevOps URL & Info
 ################################################################################
+# Note: bit.ly URLs require a header to be be passed in curl (i.e. -H "User-Agent: ping-devops")
 PING_DEVOPS_URL="https://bit.ly/ping-devops-json"
 PING_DEVOPS_JSON="${DEVOPS_WORK_DIR}/.ping-devops.json"
 PING_DEVOPS_GITHUB_CONTENT="https://raw.githubusercontent.com/pingidentity/pingidentity-devops-getting-started/master"
@@ -555,7 +557,15 @@ ping_devops_info()
     test "${_show}" != "-v" && PING_IDENTITY_DEVOPS_KEY="*** REDACTED *** (use -v to display)"
 
 
-    curl -sL ${PING_DEVOPS_MOTD_URL} > ${PING_DEVOPS_MOTD} 2>/dev/null
+    ${CURL} ${PING_DEVOPS_MOTD_URL} \
+              --output ${PING_DEVOPS_MOTD} \
+              --fail 2>/dev/null
+
+    _curl_result=$?
+
+    if test ${_curl_result} -ne 0; then
+        echo "Unable to retrieve latest news." > ${PING_DEVOPS_MOTD}
+    fi
 
     # Get the MOTD
     _jqExpr="\"# Subject: \" + .subject + \"\n#          \" +
@@ -626,13 +636,13 @@ ping_devops_version()
     #
     #      url "https://github.com/pingidentity/ping-devops/archive/v0.5.0.tar.gz"
     #
-    _latest_tool_version=$(curl -sL -H "User-Agent: ping-devops" https://bit.ly/ping-devops-version \
+    _latest_tool_version=$(${CURL} https://bit.ly/ping-devops-version \
       |  grep -e '^  url ".*"$' \
       |  sed "s/.*archive\/v\(.*\)\.tar.*/\1/")
 
     _curl_result=$?
 
-    test ${_curl_result} -ne 0 && _latest_tool_version="UNKNOWN"
+    test ${_curl_result} -ne 0 || test -z "${_latest_tool_version}" && _latest_tool_version="UNKNOWN"
     
     if test "${_latest_tool_version}" = "${VERSION}" ||
        test "${_latest_tool_version}" = "UNKNOWN"; then
@@ -653,7 +663,17 @@ function print_topic()
 {
   _topic="${1}"
 
-  curl -sL ${PING_DEVOPS_TOPICS_JSON_URL} > ${PING_DEVOPS_TOPICS_JSON} 2>/dev/null
+  # Pull the list of topics from the github api
+  ${CURL} ${PING_DEVOPS_TOPICS_JSON_URL} \
+              --output ${PING_DEVOPS_TOPICS_JSON} \
+              --fail 2>/dev/null
+
+  _curl_result=$?
+
+  if test ${_curl_result} -ne 0; then
+      echo "Unable to retrieve list of topics (trying github.com)"
+      exit 1
+  fi
 
   if test -z ${_topic}; then
       echo_green "
@@ -690,8 +710,22 @@ function print_topic()
 #          Ping Identity DevOps Topic: ${_topic}
 ################################################################################
 "
-      curl -sL ${PING_DEVOPS_TOPICS_URL}/${_topic} 2>/dev/null
+      # Pull the topic from the topics location
+      ${CURL} ${PING_DEVOPS_TOPICS_URL}/${_topic} \
+                  --output "${DEVOPS_WORK_DIR}/_${_topic}" \
+                  --fail 2>/dev/null
 
+      _curl_result=$?
+
+      if test ${_curl_result} -ne 0; then
+          echo "Unable to retrieve topic '${_topic}'."
+          echo -e "\nTo get a list of topics:"
+          echo_green "  ping-devops topic"
+          echo 
+          exit 1
+      fi
+
+      cat ${DEVOPS_WORK_DIR}/_${_topic}
       echo ""
       echo ""
       echo_green "################################################################################"
@@ -1256,14 +1290,14 @@ function get_ping_devops_json ()
     # Get the ping-devops.json file
     _curl_result=0
     
-    curl -sL -H "User-Agent: ping-devops" ${PING_DEVOPS_URL} \
+    ${CURL} -H "User-Agent: ping-devops" ${PING_DEVOPS_URL} \
               --output ${PING_DEVOPS_JSON} \
               --fail 2>/dev/null
 
     _curl_result=$?
 
     if test ${_curl_result} -ne 0; then
-        usage "Unable to get ping-devops.json from '${PING_DEVOPS_URL}'"
+        usage "Unable to get ping-devops.json (trying github.com)"
     fi
 
     _json_version=$(cat ${PING_DEVOPS_JSON} | jq -r '.minVersion')
@@ -1415,7 +1449,7 @@ function orchestration_command()
 
 
           # Get the product orchestration file
-          curl -sL ${_info_url} \
+          ${CURL} ${_info_url} \
                 --output ${_orch_file} \
                 --fail 2>/dev/null >/dev/null
 
