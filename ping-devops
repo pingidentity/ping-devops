@@ -44,16 +44,12 @@ PING_DEVOPS_STANDARD_VARIABLES="
   PING_IDENTITY_DEVOPS_HOME
   PING_IDENTITY_DEVOPS_REGISTRY
   PING_IDENTITY_DEVOPS_TAG
-  PING_IDENTITY_DEVOPS_DNS_ZONE
-  PING_IDENTITY_DEVOPS_REGION
-  PING_IDENTITY_K8S_CLUSTER_NAME
-  PING_IDENTITY_K8S_NAMESPACE
   PING_IDENTITY_ACCEPT_EULA"
 
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.5.6"
+VERSION="0.5.7"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -76,6 +72,12 @@ PING_DEVOPS_TOPICS_JSON_URL="https://api.github.com/repos/pingidentity/pingident
 PING_DEVOPS_TOPICS_JSON="${DEVOPS_WORK_DIR}/topics.json"
 PING_DEVOPS_MOTD_URL="${PING_DEVOPS_GITHUB_CONTENT}/docs/ping-devops/motd"
 PING_DEVOPS_MOTD="${DEVOPS_WORK_DIR}/motd"
+
+################################################################################
+# Get Current Kubenetes Info
+################################################################################
+CURRENT_K8S_CONTEXT="$(kubectl config current-context 2> /dev/null)"
+CURRENT_K8S_NAMESPACE="$(kubectl config view --minify --output 'jsonpath={..namespace}' 2> /dev/null)"
 
 ################################################################################
 # Check for a .pingidentity directory with propertyfile
@@ -542,7 +544,7 @@ echo_info_variable()
 {
   _varToEcho="${1}"
 
-  printf "#     %-30s : %s\n" "${_varToEcho}" "$(get_value ${_varToEcho})"
+  printf "  %-30s : %s\n" "${_varToEcho}" "$(get_value ${_varToEcho})"
 }
 
 ################################################################################
@@ -579,32 +581,32 @@ ping_devops_info()
 #     Latest News from Ping Identity DevOps
 #
 $(test -f "${PING_DEVOPS_MOTD}" && sed 's/^/#     /' < "${PING_DEVOPS_MOTD}")
-################################################################################
+#"
+
+echo "################################################################################
 #     DevOps variables sourced from ${PRINT_DEVOPS_FILE}
-################################################################################"
+################################################################################
+"
 
     echo_info_variable PING_IDENTITY_DEVOPS_USER
     echo_info_variable PING_IDENTITY_DEVOPS_KEY
-    echo "#"
+    echo ""
     echo_info_variable PING_IDENTITY_DEVOPS_HOME
     echo_info_variable PING_IDENTITY_DEVOPS_REGISTRY
-    echo "#"
+    echo ""
     echo_info_variable PING_IDENTITY_DEVOPS_TAG
-    echo_info_variable PING_IDENTITY_DEVOPS_DNS_ZONE
-    echo_info_variable PING_IDENTITY_DEVOPS_REGION
-    echo "#"
-    echo_info_variable PING_IDENTITY_K8S_CLUSTER_NAME
-    echo_info_variable PING_IDENTITY_K8S_NAMESPACE
-    echo "#"
+    echo ""
     echo_info_variable PING_IDENTITY_ACCEPT_EULA
 
 
 _listOfCustom_Variables=$(get_custom_variables)
 
 if test ! -z "$_listOfCustom_Variables"; then
-  echo "################################################################################
-#          Custom Variables
-################################################################################"
+  echo "
+################################################################################
+#     Custom Variables
+################################################################################
+"
 
   for _custVar in $_listOfCustom_Variables
   do
@@ -612,7 +614,19 @@ if test ! -z "$_listOfCustom_Variables"; then
   done
 fi
 
-echo "################################################################################
+if test ! -z ${CURRENT_K8S_CONTEXT} && test ! -z ${CURRENT_K8S_NAMESPACE}; then
+    echo "
+################################################################################
+#     Current Kubernetes (k8s) Environment
+################################################################################
+"
+    printf "  %-30s : %s\n" "Current k8s Context" "$(get_value CURRENT_K8S_CONTEXT)"
+    printf "  %-30s : %s\n" "Current k8s Namespace" "$(get_value CURRENT_K8S_NAMESPACE)"
+fi
+
+
+echo "
+################################################################################
  To change config, run: 
     ping-devops config
 "
@@ -1407,10 +1421,7 @@ function orchestration_command()
                 PING_IDENTITY_DEVOPS_USER \
                 PING_IDENTITY_DEVOPS_KEY \
                 PING_IDENTITY_DEVOPS_REGISTRY \
-                PING_IDENTITY_DEVOPS_TAG \
-                PING_IDENTITY_DEVOPS_DNS_ZONE \
-                PING_IDENTITY_K8S_CLUSTER_NAME \
-                PING_IDENTITY_K8S_NAMESPACE
+                PING_IDENTITY_DEVOPS_TAG
 
             _orch_file="kustomization.yaml"
             ;;
@@ -1517,8 +1528,8 @@ function orchestration_command()
                     echo -e "#  Starting kubernetes deployment of '${_product}'
 #  
 #     Kustomization URL: ${_kust_url}
-#    Kubernetes Context: ${GREEN}$(kubectx -c)${NORMAL}
-#  Kubernetes Namespace: ${GREEN}$(kubens -c)${NORMAL}
+#    Kubernetes Context: ${GREEN}${CURRENT_K8S_CONTEXT}${NORMAL}
+#  Kubernetes Namespace: ${GREEN}${CURRENT_K8S_NAMESPACE}${NORMAL}
 # 
 #  Additional kubectl Commands
 # 
@@ -1585,13 +1596,12 @@ function orchestration_command()
                     run_command "${DOCKER} container prune -f"
                     ;;
                 kubernetes)
-                    _namespace=$(kubens -c)
                     echo ""
                     echo "You are about to clean all the kubernetes resources below..."
                     echo ""
                     echo -e "################################################################################"
-                    echo -e "#    Kubernetes Context: ${GREEN}$(kubectx -c)${NORMAL}"
-                    echo -e "#  Kubernetes Namespace: ${GREEN}${_namespace}${NORMAL}"
+                    echo -e "#    Kubernetes Context: ${GREEN}${CURRENT_K8S_CONTEXT}${NORMAL}"
+                    echo -e "#  Kubernetes Namespace: ${GREEN}${CURRENT_K8S_NAMESPACE}${NORMAL}"
                     echo -e "################################################################################"
                     kubectl get all
                     echo ""
@@ -1681,22 +1691,6 @@ function devops_config()
     devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_HOME"               "${HOME}/projects/devops" "Location of Ping Identity DevOps repos and tools"
     devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_REGISTRY"           "docker.io/pingidentity"  "Ping Identity DevOps Registry (recommend default: docker.io/pingidentity)"
     devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_TAG"                "edge"                    "Ping Identity DevOps Tag (recommend default: edge)"
-
-    echo "
-################################################################################
-#              Ping Identity DevOps Kubernetes Variables
-################################################################################
-# Variables used to assist kubernetes tools and .yaml files during kubernetes
-# deployments
-#
-# These can be set to nothing if no Kubernetes deployments or tools are used.
-################################################################################
-" | tee -a ${DEVOPS_FILE}
-
-    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_DNS_ZONE"           "" "DNS Zone used with Kubernetes Ingresses"
-    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_DEVOPS_REGION"             "" "Cloud Region used for Kubernetes (i.e. us-east-2"
-    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_CLUSTER_NAME"          "" "Kubernetes Cluster Name used"
-    devops_add_config "${DEVOPS_FILE}" "PING_IDENTITY_K8S_NAMESPACE"             "" "Kubernetes Namespace used"
 
     echo "
 ################################################################################

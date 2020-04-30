@@ -29,10 +29,6 @@ cat <<EOHELP
 +----------------------------------------------------------------------------+
 |                   ${bold}Ping Identity Docker Helper Aliases${normal}                      |
 +----------------------------------------------------------------------------+
- ${bold}DevOps Information${normal}
- -------------------------------------
- denv - get devops details
- 
  ${bold}Container${normal}                                 ${bold}Image${normal}
  -------------------------------------     ----------------------------------
  dce - execute commands (i.e. /bin/sh)     dib - build 
@@ -66,6 +62,8 @@ cat <<EOHELP
  ${bold}Special${normal}
  ----------------------------------------------------------------------------
  ddc - deep clean (cont, vol, net)
+ dnuke - deletes everything from local docker unused data
+      
  pingdownload - download product or license to ~/Downloads
  pdog - cd to 'pingidentity-devops-getting-started' directory
  pdob - cd to 'pingidentity-docker-builds' directory
@@ -77,34 +75,11 @@ EOHELP
 ## denv
 function denv () 
 {
-    sourcePingIdentityFiles
+  echo "
+denv alias has been deprecated. Please use:
 
-cat <<EOP1ENV
-+-----------------------------------------------------------------------------------------+
-|             ${bold}Ping Identity DevOps Information${normal}
-|             ${bold}Sourced from ~/.pingidentity/devops${normal}
-+-----------------------------------------------------------------------------------------+
-|          PING_IDENTITY_DEVOPS_USER: ${PING_IDENTITY_DEVOPS_USER}
-|          PING_IDENTITY_DEVOPS_KEY : ${PING_IDENTITY_DEVOPS_KEY}
-|
-|          PING_IDENTITY_DEVOPS_HOME: ${PING_IDENTITY_DEVOPS_HOME}
-|          PING_IDENTITY_DEVOPS_TAG : ${PING_IDENTITY_DEVOPS_TAG}
-+-----------------------------------------------------------------------------------------+
- To update, run Ping Identity DevOps Setup 
-    (found in your the pingidentity-devops-getting-started git repo)/setup
-
- To use with 'docker run command'
-     docker run 
-        ... 
-        --env-file ~/.pingidentity/devops
-        ...
-
- To use with '.yaml' file (use snippet below)
-     pingdirectory:
-       env_file:
-         - $HOME/.pingidentity/devops
-+-----------------------------------------------------------------------------------------+
-EOP1ENV
+   ping-devops info
+"
 }
 
 function run ()
@@ -220,41 +195,17 @@ alias dlf="run docker logs -f"
 ## deep clean
 alias ddc="dcp ; dvp ; dip; dnp"
 
+## delete everything from docker spaces
+alias dnuke="docker system prune -af"
+
 ## kenv
 function kenv () 
 {
-    sourcePingIdentityFiles
+  echo "
+kenv alias has been deprecated. Please use:
 
-cat <<EOP1ENV
-+-----------------------------------------------------------------------------------------+
-|             ${bold}Ping Identity DevOps Kubernetes Information${normal}
-|             ${bold}Sourced from ~/.pingidentity/devops${normal}
-+-----------------------------------------------------------------------------------------+
-|          PING_IDENTITY_DEVOPS_USER: ${PING_IDENTITY_DEVOPS_USER}
-|          PING_IDENTITY_DEVOPS_KEY : ${PING_IDENTITY_DEVOPS_KEY}
-|
-|     PING_IDENTITY_DEVOPS_DNS_ZONE : ${PING_IDENTITY_DEVOPS_DNS_ZONE}
-|       PING_IDENTITY_DEVOPS_REGION : ${PING_IDENTITY_DEVOPS_REGION}
-|
-|    PING_IDENTITY_K8S_CLUSTER_NAME : ${PING_IDENTITY_K8S_CLUSTER_NAME}
-|       PING_IDENTITY_K8S_NAMESPACE : ${PING_IDENTITY_K8S_NAMESPACE}
-+-----------------------------------------------------------------------------------------+
-
- Generating a Kubernetes Secret devops-secret
-
-   ping-devops generate devops-secret
-
- Generating the tls-secret for your domain '${PING_IDENTITY_DEVOPS_DNS_ZONE}'
-
-   ping-devops generate tls-secret ${PING_IDENTITY_DEVOPS_DNS_ZONE}
-
-+-----------------------------------------------------------------------------------------+
-|             ${bold}Current Kubernetes Context/Namespace (from kubectl config ...)${normal}
-+-----------------------------------------------------------------------------------------+
-|               Current k8s Context : $(kubectl config current-context)
-|             Current k8s Namespace : $(kubectl config view --minify --output 'jsonpath={..namespace}')
-+-----------------------------------------------------------------------------------------+
-EOP1ENV
+   ping-devops info
+"
 }
 
 ## khelp
@@ -264,9 +215,8 @@ cat <<EOHELP
 +----------------------------------------------------------------------------+
 |                   ${bold}Ping Identity DevOps Kubernetes Aliases${normal}                      |
 +----------------------------------------------------------------------------+
- ${bold}DevOps k8s Information${normal}
+ ${bold}k8s Information${normal}
  -------------------------------------
- kenv - get kubernetes info
  kubectx - get kubernetes context info
  kubens - get kubernetes namespace info
 
@@ -344,7 +294,7 @@ function k () {
 }
 
 ## kubernetes general aliases
-alias kall="k get all"
+alias kall="k get pods,svc,deploy,rs,job,ing,pvc"
 
 alias kget="k get"
 alias kg="kget"
