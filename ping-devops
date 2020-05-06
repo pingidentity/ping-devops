@@ -626,7 +626,7 @@ ping_devops_version()
     #      url "https://github.com/pingidentity/ping-devops/archive/v0.5.0.tar.gz"
     #
     _latest_tool_version=$(${CURL} https://bit.ly/ping-devops-version \
-      |  grep '^  url ".*"$' \
+      |  grep -e '^  url ".*"$' \
       |  sed "s/.*archive\/v\(.*\)\.tar.*/\1/")
 
     _curl_result=$?
