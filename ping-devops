@@ -49,7 +49,7 @@ PING_DEVOPS_STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.5.7"
+VERSION="0.5.8"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -141,13 +141,20 @@ echo_error()
     fi
 }
 
+function banner()
+{
+  echo "-------------------------------------------------------------------------"
+  echo -e "$*"
+  echo "-------------------------------------------------------------------------"
+
+}
+
 function run_command()
 {
   CMD="${1}"
   CMD_OUTPUT="${2}"
-  echo "-------------------------------------------------------------------------"
-  echo -e "Command: ${BOLD}$CMD $(test ! -z "${CMD_OUTPUT}" && echo "> ${CMD_OUTPUT}")${NORMAL}"
-  echo "-------------------------------------------------------------------------"
+  
+  banner "Command: ${BOLD}$CMD $(test ! -z "${CMD_OUTPUT}" && echo "> ${CMD_OUTPUT}")${NORMAL}"
   
   test -z "${CMD_OUTPUT}" && $CMD
   test ! -z "${CMD_OUTPUT}" && $CMD > ${CMD_OUTPUT}
@@ -1513,8 +1520,12 @@ function orchestration_command()
                     
                     run_command "ping-devops generate devops-secret" "devops-secret.yaml"
                     run_command "$KUBECTL apply -f devops-secret.yaml"
-                    run_command "ping-devops generate tls-secret ${PING_IDENTITY_DEVOPS_DNS_ZONE}" "tls-secret.yaml"
-                    run_command "$KUBECTL apply -f tls-secret.yaml"
+                    
+                    if test ! -z "${PING_IDENTITY_DEVOPS_DNS_ZONE}"; then
+                        run_command "ping-devops generate tls-secret ${PING_IDENTITY_DEVOPS_DNS_ZONE}" "tls-secret.yaml"
+                        run_command "$KUBECTL apply -f tls-secret.yaml"
+                    fi
+                    
                     run_command "$KUSTOMIZE build ${_kust_url}" "kustomize_output.yaml"
                     mv kustomize_output.yaml before_envsubst.yaml
                     cat before_envsubst.yaml | envsubst > kustomize_output.yaml
