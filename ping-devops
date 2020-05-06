@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env sh
 ########################################################################################################################
 #
 # This script is used to manage a Ping Identity DevOps environment for Docker, Docerk Compose and Kubernetes.
@@ -49,7 +49,7 @@ PING_DEVOPS_STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.5.8"
+VERSION="0.6.0"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -118,7 +118,7 @@ BOLD='\033[1m'
 ################################################################################
 echo_red()
 {
-    echo -e "${RED}$*${NORMAL}"
+    echo "${RED}$*${NORMAL}"
 }
 
 ################################################################################
@@ -126,7 +126,7 @@ echo_red()
 ################################################################################
 echo_green()
 {
-    echo -e "${GREEN}$*${NORMAL}"
+    echo "${GREEN}$*${NORMAL}"
 }
 
 ################################################################################
@@ -144,7 +144,7 @@ echo_error()
 function banner()
 {
   echo "-------------------------------------------------------------------------"
-  echo -e "$*"
+  echo "$*"
   echo "-------------------------------------------------------------------------"
 
 }
@@ -184,9 +184,9 @@ function check_variables()
   done
 
   test ${_var_check_fails} \
-    && echo -e "\nTo get more information on these variables:" \
+    && echo "\nTo get more information on these variables:" \
     && echo_green "  ping-devops topic devops-variables" \
-    && echo -e "\nSet this/these in your config with:" \
+    && echo "\nSet this/these in your config with:" \
     && echo_green "  ping-devops config" \
     && echo "" \
     && exit
@@ -209,9 +209,9 @@ function usage()
 {
   echo_error "$*"
 
-  echo -e "$USAGE_HEADER"
+  echo "$USAGE_HEADER"
 
-  echo -e "#
+  echo "#
 #  Documentation: https://pingidentity-devops.gitbook.io/devops/
 #   GitHub Repos: https://github.com/topics/ping-devops
 ################################################################################${NORMAL}
@@ -222,11 +222,12 @@ ${GREEN}General Usage:${NORMAL}
   ping-devops version                           # Version Details and Check
   ping-devops topic [ {topic-name} ]            # Short Help Topics
 
-${GREEN}Generate Kubernetes/Kustomize Resource:${NORMAL}
+${GREEN}Generate Kubernetes/Kustomize/License Resources:${NORMAL}
   ping-devops generate devops-secret                    # Ping DevOps secret
   ping-devops generate tls-secret {domain}              # TLS Cert/Key (i.e. example.com)
   ping-devops generate ssh-id-secret {ssh id_rsa file}  # SSH ID Key (i.e. ~/.ssh/id_rsa)
-  ping-devops generate license-secret {license file}    # License file (i.e. pingdirectory.lic)
+  ping-devops generate license {product}                # Eval license file for product
+  ping-devops generate license-secret {license file}    # License secret from license file
   ping-devops generate kustomization.yaml               # Skeleton kustomization.yaml
 
 ${GREEN}Running Docker/Kubernetes Evironments:${NORMAL}
@@ -234,7 +235,7 @@ ${GREEN}Running Docker/Kubernetes Evironments:${NORMAL}
   ping-devops kubernetes [info|start|rm|clean]  
 "
 
-  echo -e "$USAGE_FOOTER"
+  echo "$USAGE_FOOTER"
   exit
 }
 
@@ -248,13 +249,13 @@ function usage_command()
 
   echo_error "$*"
 
-  echo -e "$USAGE_HEADER
+  echo "$USAGE_HEADER
 ################################################################################${NORMAL}
 "
 
   case "${_usageCmd}" in
     docker)
-      echo -e "${GREEN}Running Docker Getting Started Containers:${NORMAL}
+      echo "${GREEN}Running Docker Getting Started Containers:${NORMAL}
   ping-devops docker info                      # Lists all available use-cases/products
   ping-devops docker info  {product}           # Information on user-case/product
   ping-devops docker start {product}           # Starts services  (i.e. docker-compose up)
@@ -263,7 +264,7 @@ function usage_command()
   ping-devops docker clean                     # Cleans all ping_devops docker services"
       ;;
     kubernetes)
-      echo -e "${GREEN}Running Kubernetes Getting Started Containers:${NORMAL}
+      echo "${GREEN}Running Kubernetes Getting Started Containers:${NORMAL}
   ping-devops kubernetes info                  # Lists all available use-cases/products
   ping-devops kubernetes info  {product}       # Information on user-case/product
   ping-devops kubernetes start {product}       # Starts services  (i.e. kubectl create)
@@ -316,7 +317,7 @@ find_setup_arg_value()
   _findFile="${2}"
   _defaultVal="${3}"
   
-  _valFound=$(grep -e "$_valToFind" ${_findFile} | sed "s/.*$_valToFind \(.*\) .*\\\\$/\1/g")
+  _valFound=$(grep "$_valToFind" ${_findFile} | sed "s/.*$_valToFind \(.*\) .*\\\\$/\1/g")
 
   test -z "${_valFound}" && _valFound="${_defaultVal}"
 
@@ -350,7 +351,7 @@ Let's add helper alias' and functions to your shell.
 We are assuming you use bash and will add these to your ${BASH_PROFILE}
 "
 
-        echo -n "  OK if we add a 'source ${PING_DEVOPS_BASH_PROFILE}' command to your ${BASH_PROFILE} (y/n) [y] ? "
+        echo "  OK if we add a 'source ${PING_DEVOPS_BASH_PROFILE}' command to your ${BASH_PROFILE} (y/n) [y] ? \c"
         read answer
 
         if [ "${answer}" == "" ] || [ "${answer}" == "Y" ] || [ "${answer}" == "y" ]; then
@@ -363,7 +364,7 @@ test -f '${PING_DEVOPS_BASH_PROFILE}' && source '${PING_DEVOPS_BASH_PROFILE}'" >
     grep "sourcePingIdentityFiles" "${BASH_PROFILE}" >/dev/null
 
     if test "$?" = "1"; then
-        echo -n "  OK if we add a 'sourcePingIdentityFiles' command to your ${BASH_PROFILE} (y/n) [y] ? "
+        echo "  OK if we add a 'sourcePingIdentityFiles' command to your ${BASH_PROFILE} (y/n) [y] ? \c"
         read answer
         if [ "${answer}" == "" ] || [ "${answer}" == "Y" ] || [ "${answer}" == "y" ]; then
             echo "
@@ -413,14 +414,14 @@ function devops_add_config()
   test -z "${CURRENT_VALUE}" && CURRENT_VALUE="${VAR_DEFAULT}"
 
   echo "${VAR_PROMPT}"
-  echo -ne "    [${GREEN}${CURRENT_VALUE}${NORMAL}] ? "
-  #echo -ne "${VAR_PROMPT} [${GREEN}${CURRENT_VALUE}${NORMAL}] ? "
+  echo "    [${GREEN}${CURRENT_VALUE}${NORMAL}] ? \c"
   read answer
   echo ""
+
   if test ! -z "${answer}"; then
     if test "${answer}" = "-"; then
       if test -z "${VAR_TO_SET}"; then
-        echo -n "" >> ${PROPS_FILE}
+        echo "" >> ${PROPS_FILE}
       else
         eval "unset \${VAR_TO_SET}"
 
@@ -433,7 +434,7 @@ function devops_add_config()
       fi
     else
       if test -z "${VAR_TO_SET}"; then
-        echo -n "${answer}" >> ${PROPS_FILE}
+        echo "${answer}" >> ${PROPS_FILE}
       else
         eval "export \${VAR_TO_SET}=${answer}"
         echo "${VAR_TO_SET}=${answer}" >> ${PROPS_FILE}
@@ -441,7 +442,7 @@ function devops_add_config()
     fi
   else
     if test -z "${VAR_TO_SET}"; then
-        echo -n "${CURRENT_VALUE}" >> ${PROPS_FILE}
+        echo "${CURRENT_VALUE}" >> ${PROPS_FILE}
     else
         echo "${VAR_TO_SET}=${CURRENT_VALUE}" >> ${PROPS_FILE}
     fi
@@ -452,7 +453,7 @@ function devops_add_config()
 ################################################################################
 function print_variable_setting_instructions()
 {
-  echo -e "
+  echo "
 ################################################################################
 #  Setting Variables:
 #      [enter]     to accept current value
@@ -479,7 +480,7 @@ function devops_add_config_custom()
       devops_add_config ${PROPS_FILE} ${_varName}  ""  "Set Custom Variable '${_varName}'"
   done
 
-  echo -e "
+  echo "
 ################################################################################
 #  Add Additional Variables:
 #
@@ -490,7 +491,7 @@ function devops_add_config_custom()
   
   while true
   do
-      echo -ne "Enter a new NAME=VALUE [enter to end] : "
+      echo "Enter a new NAME=VALUE [enter to end] : \c"
 
       read answer
 
@@ -498,39 +499,6 @@ function devops_add_config_custom()
 
       echo "$answer" >> ${PROPS_FILE}
   done
-
-
-  # CURRENT_VALUE=$(get_value ${VAR_TO_SET})
-  # test -z "${CURRENT_VALUE}" && CURRENT_VALUE="${VAR_DEFAULT}"
-
-  # echo "${VAR_PROMPT}"
-  # echo -ne "    [${GREEN}${CURRENT_VALUE}${NORMAL}] ? "
-  # #echo -ne "${VAR_PROMPT} [${GREEN}${CURRENT_VALUE}${NORMAL}] ? "
-  # read answer
-  # echo ""
-  # if test ! -z "${answer}"; then
-  #   if test "${answer}" = "-"; then
-  #     if test -z "${VAR_TO_SET}"; then
-  #       echo -n "" >> ${PROPS_FILE}
-  #     else
-  #       eval "unset \${VAR_TO_SET}"
-  #       echo "${VAR_TO_SET}=" >> ${PROPS_FILE}
-  #     fi
-  #   else
-  #     if test -z "${VAR_TO_SET}"; then
-  #       echo -n "${answer}" >> ${PROPS_FILE}
-  #     else
-  #       eval "export \${VAR_TO_SET}=${answer}"
-  #       echo "${VAR_TO_SET}=${answer}" >> ${PROPS_FILE}
-  #     fi
-  #   fi
-  # else
-  #   if test -z "${VAR_TO_SET}"; then
-  #       echo -n "${CURRENT_VALUE}" >> ${PROPS_FILE}
-  #   else
-  #       echo "${VAR_TO_SET}=${CURRENT_VALUE}" >> ${PROPS_FILE}
-  #   fi
-  # fi
 }
 
 ################################################################################
@@ -658,7 +626,7 @@ ping_devops_version()
     #      url "https://github.com/pingidentity/ping-devops/archive/v0.5.0.tar.gz"
     #
     _latest_tool_version=$(${CURL} https://bit.ly/ping-devops-version \
-      |  grep -e '^  url ".*"$' \
+      |  grep '^  url ".*"$' \
       |  sed "s/.*archive\/v\(.*\)\.tar.*/\1/")
 
     _curl_result=$?
@@ -672,7 +640,7 @@ ping_devops_version()
         _version_msg="${RED}${VERSION}${NORMAL} (updated version ${_latest_tool_version} is available)\n$(print_update_information)"
     fi
 
-    echo -e "ping-devops version ${_version_msg}"
+    echo "ping-devops version ${_version_msg}"
 }
 
 ################################################################################
@@ -740,7 +708,7 @@ function print_topic()
 
       if test ${_curl_result} -ne 0; then
           echo "Unable to retrieve topic '${_topic}'."
-          echo -e "\nTo get a list of topics:"
+          echo "\nTo get a list of topics:"
           echo_green "  ping-devops topic"
           echo 
           exit 1
@@ -770,50 +738,56 @@ function generate_resource()
                 PING_IDENTITY_DEVOPS_KEY 
                 
             check_for_tool $BASE64
-            _devopsUser=$(base64_no_newlines "${PING_IDENTITY_DEVOPS_USER}")
-            _devopsKey=$(base64_no_newlines "${PING_IDENTITY_DEVOPS_KEY}")
+
             echo "
 apiVersion: v1
 kind: Secret
 metadata:
   name: devops-secret
+  annotations:
+    ping-devops.user: ${PING_IDENTITY_DEVOPS_USER}
+    ping-devops.app-version: v${VERSION}
 type: Opaque
 data:
-  PING_IDENTITY_DEVOPS_USER: ${_devopsUser}
-  PING_IDENTITY_DEVOPS_KEY: ${_devopsKey}
+  PING_IDENTITY_DEVOPS_USER: $(base64_no_newlines "${PING_IDENTITY_DEVOPS_USER}")
+  PING_IDENTITY_DEVOPS_KEY: $(base64_no_newlines "${PING_IDENTITY_DEVOPS_KEY}")
 "
             ;;
 
         tls-secret)
             _domain="${2}"
             test -z "${_domain}" && usage "Missing tls-secret domain"
-            CERTS_DIR=$(mktemp -d)
-            cd "${CERTS_DIR}"
-            DOMAIN="ping-devops.com"
 
             check_for_tool $OPENSSL
             check_for_tool $BASE64
-            $OPENSSL req -x509 -nodes -newkey rsa:2048 -days 3650 -sha256 \
-              -out tls.crt -keyout tls.key \
-              -subj "/CN=${DOMAIN}" \
-              -reqexts SAN -extensions SAN \
-              -config <(cat /etc/ssl/openssl.cnf; printf "[SAN]\nsubjectAltName=DNS:*.${DOMAIN}") > /dev/null 2>&1
 
-            _tlsCRT="$(base64_no_newlines tls.crt)"
-            _tlsKEY="$(base64_no_newlines tls.key)"
+            test ! -f /etc/ssl/openssl.cnf && echo_error "Missing /etc/ssl/openssl.cnf" && exit
+            
+            _opensslcnf="${TMP_DIR}/openssl.cnf"
+            _tlsKey="${TMP_DIR}/tls.key"
+            _tlsCrt="${TMP_DIR}/tls.crt"
+
+            cat /etc/ssl/openssl.cnf > ${_opensslcnf}
+            printf "[SAN]\nsubjectAltName=DNS:*.${_domain}" >> ${_opensslcnf}
+            
+            $OPENSSL req -x509 -nodes -newkey rsa:2048 -days 3650 -sha256 \
+              -out "${_tlsKey}" -keyout "${_tlsCrt}" \
+              -subj "/CN=${_domain}" \
+              -reqexts SAN -extensions SAN \
+              -config ${_opensslcnf} > /dev/null 2>&1
+
             echo "
 apiVersion: v1
 kind: Secret
 type: kubernetes.io/tls
 metadata:
   name: tls-secret
+  annotations:
+    ping-devops.dns-zone: ${_domain}
+    ping-devops.app-version: v${VERSION}
 data:
-  tls.crt: ${_tlsCRT}
-  tls.key: ${_tlsKEY}"
-
-            cd - > /dev/null
-            rm -rf "${CERTS_DIR}"
-
+  tls.crt: $(base64_no_newlines ${_tlsKey})
+  tls.key: $(base64_no_newlines ${_tlsCrt})"
             ;;
         ssh-id-secret)
             _idKey="${2}"
@@ -827,8 +801,8 @@ data:
   id_rsa: |
     $(base64_no_newlines ${_idKey})"
             ;;
-        license-secret)
-            generate_license_secret "${2}"
+        license-secret|license)
+            generate_license_secret "${1}" "${2}"
             ;;
 
         kustomization|kustomization.yaml)
@@ -859,20 +833,47 @@ EOK
 } 
 
 ################################################################################
-# generate_license_secret (name of product or license file)
+# generate_license_secret (command, name of product or license file)
 #
 # Generates a license secret for the passed license file or name of product
 #  - license_file or product_name
 ################################################################################
 function generate_license_secret()
 {
-  _licenseArg="${1}"
+  _licenseType="${1}"
+  _licenseArg="${2}"
 
-  if test -f ${_licenseArg}; then
-    _licenseSecret=$(base64_no_newlines ${_licenseArg})
+  case "${_licenseType}" in
+      license-secret)
+          test ! -f "${_licenseArg}" && usage "Missing license file (i.e. /path/pingfederate.lic)"
+          _licenseFile="${_licenseArg}"
+          ;;
+      license)  
+          test -z "${_licenseArg}" && usage "Missing product name (i.e. pingfederate)"
+          _licenseProd="${_licenseArg}"
+          ;;
+      *)
+          usage "Unknown generate resource '${_licenseType}"
+  esac
+
+  #
+  # Creating a Kubernetes License-scret from a license file
+  #
+  if test ! -z ${_licenseFile}; then
+    _licenseSecret=$(base64_no_newlines ${_licenseFile})
+
+    echo "
+apiVersion: v1
+kind: Secret
+metadata:
+  name: license-secret
+data:
+  license: |
+    ${_licenseSecret}"
+  #
+  # Getting an evaluation license based on product passed
   else
-
-    case "${_licenseArg}" in
+    case "${_licenseProd}" in
       pingaccess|pingcentral|pingdatametrics|pingdatasync|pingdatagovernance|pingdatagovernancepap|pingdirectory|pingdirectoryproxy|pingfederate)
          
         check_for_tool $DOCKER
@@ -882,33 +883,22 @@ function generate_license_secret()
             PING_IDENTITY_DEVOPS_KEY 
 
         $DOCKER run --rm -v /tmp:/tmp ${PING_IDENTITY_DEVOPS_REGISTRY}/pingdownloader \
-          --product ${_licenseArg} \
+          --product ${_licenseProd} \
           --license \
           --devops-user "${PING_IDENTITY_DEVOPS_USER}" \
           --devops-key "${PING_IDENTITY_DEVOPS_KEY}" \
-          --devops-app "pingdevops-${_licenseArg}" | grep "^\#"
+          --devops-app "pingdevops" >/dev/null 2>>/dev/null
         _dockerRunResult=$?
 
-        test $_dockerRunResult -ne 0 && usage "Unable to pull eval license (result=$_dockerRunResult)" 
+        test $_dockerRunResult -ne 0 && usage "Unable to pull eval license (result=$_dockerRunResult)\nCheck that you can run 'docker version'\nCheck that your PING_IDENTITY_DEVOPS_USER and PING_IDENTITY_DEVOPS_USER are valid." 
       
-        _licenseSecret=$(base64_no_newlines /tmp/product.lic)
-
-        rm /tmp/product.lic
+        cat /tmp/product.lic
         ;;
       *)
-        usage "License File '${_licenseArg}' not found"
+        usage "Product or license file not found '${_licenseProd}'"
         ;;
     esac
-  fi
-            echo "
-apiVersion: v1
-kind: Secret
-metadata:
-  name: license-secret
-data:
-  license: |
-    ${_licenseSecret}"
-
+  fi  
 }
 
 ################################################################################
@@ -1324,11 +1314,11 @@ function get_ping_devops_json ()
     _json_version=$(cat ${PING_DEVOPS_JSON} | jq -r '.minVersion')
 
     if test "${_json_version}" != "${VERSION}" &&
-       test "$( echo -e "${_json_version}\\n${VERSION}" | sort -V | head -2 | tail -1)" = ${_json_version}
+       test "$( echo "${_json_version}\\n${VERSION}" | sort -V | head -2 | tail -1)" = ${_json_version}
     then
       echo "ping-devops update required"
-      echo -e "           current version ${RED}${VERSION}${NORMAL}"
-      echo -e "  minimum required version ${GREEN}${_json_version}${NORMAL}"
+      echo "           current version ${RED}${VERSION}${NORMAL}"
+      echo "  minimum required version ${GREEN}${_json_version}${NORMAL}"
       print_update_information
       exit
     fi
@@ -1536,7 +1526,7 @@ function orchestration_command()
 
                     echo ""
                     grep "^#-" "${_orch_file}"
-                    echo -e "#  Starting kubernetes deployment of '${_product}'
+                    echo "#  Starting kubernetes deployment of '${_product}'
 #  
 #     Kustomization URL: ${_kust_url}
 #    Kubernetes Context: ${GREEN}${CURRENT_K8S_CONTEXT}${NORMAL}
@@ -1586,7 +1576,7 @@ function orchestration_command()
                     echo_red "IMPORTANT: This is destructive of all content in these running containers.
         "
 
-                    echo -n "Are you SURE you want to clean these ping_devops images (y/n) [n] ? "
+                    echo "Are you SURE you want to clean these ping_devops images (y/n) [n] ? \c"
                     read answer
 
                     if [ "${answer}" != "Y" ] && [ "${answer}" != "y" ]; then
@@ -1610,16 +1600,16 @@ function orchestration_command()
                     echo ""
                     echo "You are about to clean all the kubernetes resources below..."
                     echo ""
-                    echo -e "################################################################################"
-                    echo -e "#    Kubernetes Context: ${GREEN}${CURRENT_K8S_CONTEXT}${NORMAL}"
-                    echo -e "#  Kubernetes Namespace: ${GREEN}${CURRENT_K8S_NAMESPACE}${NORMAL}"
-                    echo -e "################################################################################"
+                    echo "################################################################################"
+                    echo "#    Kubernetes Context: ${GREEN}${CURRENT_K8S_CONTEXT}${NORMAL}"
+                    echo "#  Kubernetes Namespace: ${GREEN}${CURRENT_K8S_NAMESPACE}${NORMAL}"
+                    echo "################################################################################"
                     kubectl get all
                     echo ""
                     echo_red "IMPORTANT: This is destructive of all content in these running containers.
         "
 
-                    echo -n "Are you SURE you want to clean these kubernetes resources (y/n) [n] ? "
+                    echo "Are you SURE you want to clean these kubernetes resources (y/n) [n] ? \c"
                     read answer
 
                     if [ "${answer}" != "Y" ] && [ "${answer}" != "y" ]; then
@@ -1630,13 +1620,13 @@ function orchestration_command()
                     fi
 
                     echo ""
-                    echo -e "################################################################################"
-                    echo -e "#    All pods, statefulsets, deployments and services have been deleted."
-                    echo -e "#    To perform a deep clean on all other kubernetes in your workspace use"
-                    echo -e "#    following alias:"
-                    echo -e "# "
-                    echo -e "#    knuke"
-                    echo -e "################################################################################"
+                    echo "################################################################################"
+                    echo "#    All pods, statefulsets, deployments and services have been deleted."
+                    echo "#    To perform a deep clean on all other kubernetes in your workspace use"
+                    echo "#    following alias:"
+                    echo "# "
+                    echo "#    knuke"
+                    echo "################################################################################"
                     
                     ;;
             esac
@@ -1750,7 +1740,7 @@ base64_no_newlines() {
   if test -f "${1}"; then
     cat "${1}" | $BASE64 | tr -d '\r?\n'
   else
-    echo -n "${1}" | $BASE64 | tr -d '\r?\n'
+    echo "${1}" | $BASE64 | tr -d '\r?\n'
   fi
 }
 
