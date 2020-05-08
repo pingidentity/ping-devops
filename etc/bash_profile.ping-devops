@@ -420,10 +420,11 @@ EOP1HELP
 ## sourcePingIdentityFiles
 sourcePingIdentityFiles () 
 {
+    set -a
     # shellcheck disable=SC1090
     test -f "${HOME}/.pingidentity/devops" && \
-        . "${HOME}/.pingidentity/devops" && \
-        export "$(grep "^[A-Z]" ~/.pingidentity/devops | cut -d= -f1)"
+        . "${HOME}/.pingidentity/devops"
+    set +a
 }
 
 ## p1env
