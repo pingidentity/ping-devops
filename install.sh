@@ -10,13 +10,13 @@
 
 INSTALL_DIR=$(pwd)
 
-if [ -f $INSTALL_DIR/ping-devops ]; then
+if [ -f "$INSTALL_DIR/ping-devops" ]; then
   echo "ping-devops already installed in ${INSTALL_DIR}"
   echo "Please remove or move to reinstall"
   exit 1
 fi
 
-TMP_DIR=`mktemp -d`
+TMP_DIR=$(mktemp -d)
 if [[ ! "$TMP_DIR" || ! -d "$TMP_DIR" ]]; then
   echo "Could not create temp dir."
   exit 1
@@ -28,7 +28,7 @@ function cleanup {
 
 trap cleanup EXIT
 
-pushd $TMP_DIR >& /dev/null
+cd "$TMP_DIR" >& /dev/null || echo "Unable to chanage to temporary directory" || exit 1
 
 curl -s https://raw.githubusercontent.com/pingidentity/homebrew-devops/master/Formula/ping-devops.rb |\
   grep url |\
@@ -37,10 +37,10 @@ curl -s https://raw.githubusercontent.com/pingidentity/homebrew-devops/master/Fo
 
 tar xzf ./*.tar.gz
 
-cd ping-devops-*
+cd ping-devops-* || echo "Unable to chanage to ping-devops-*" || exit 1
 
-cp ping-devops                  $INSTALL_DIR/.
-cp etc/bash_profile.ping-devops $INSTALL_DIR/.
+cp ping-devops                  "$INSTALL_DIR/."
+cp etc/bash_profile.ping-devops "$INSTALL_DIR/."
 
 echo "
 ################################################################################

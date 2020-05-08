@@ -1,3 +1,4 @@
+#!/usr/bin/env sh
 ##############################################################################
 # Aliases of commonly used docker commands and those related to the
 # Ping Identity DevOps Program.
@@ -12,9 +13,9 @@
 bold=$(tput bold)
 normal=$(tput sgr0)
 
-function pdo() 
+pdo() 
 { 
-    run cd ${PING_IDENTITY_DEVOPS_HOME}/$* 
+    run cd "${PING_IDENTITY_DEVOPS_HOME}/$*" 
 }
 
 alias pdog="pdo pingidentity-devops-getting-started"
@@ -23,7 +24,7 @@ alias pdos="pdo pingidentity-server-profiles"
 
 
 ## dhelp
-function dhelp () 
+dhelp () 
 {
 cat <<EOHELP
 +----------------------------------------------------------------------------+
@@ -73,7 +74,7 @@ EOHELP
 }
 
 ## denv
-function denv () 
+denv () 
 {
   echo "
 denv alias has been deprecated. Please use:
@@ -82,16 +83,16 @@ denv alias has been deprecated. Please use:
 "
 }
 
-function run ()
+run ()
 {
   #date
   echo "Alias Expansion: ${bold}$*${normal}"
   #time $*
-  $*
+  "$@"
 }
 
 # PingDownload alias
-alias pingdownload="docker run --rm -v ~/Downloads:/tmp pingidentity/pingdownloader"
+alias pingdownload="run docker run --env-file ~/.pingidentity/devops --rm -v ~/Downloads:/tmp pingidentity/pingdownloader"
 
 # Docker
 alias dps="run docker ps"
@@ -100,9 +101,8 @@ alias dps="run docker ps"
 dsa() 
 { 
   echo "Running command to: ${bold}Stop all running containers${normal}";
-  c=$(docker container ls -a -q)
-  if ! test -z $c ; then
-    docker container stop $(docker container ls -a -q)
+  if ! test -z "$(docker container ls -a -q)" ; then
+    docker container stop "$(docker container ls -a -q)"
   else
     echo "No containers found to stop"
   fi
@@ -112,9 +112,8 @@ dsa()
 dra() 
 {
   echo "Running command to: ${bold}Remove all stopped containers${normal}";
-  c=$(docker container ls -a -q)
-  if ! test -z $c ; then
-    docker container rm $(docker container ls -a -q)
+  if ! test -z "$(docker container ls -a -q)" ; then
+    docker container rm "$(docker container ls -a -q)"
   else
     echo "No containers found to remove"
   fi
@@ -143,9 +142,8 @@ diw()
 {
   echo "Running command to: ${bold}Remove all Ping Identity Docker images${normal}";
   dip;
-  i=$(docker images 'pingidentity/*' -q|sort|uniq);
-  if [ ! -z "${i}" ]; then
-    run docker image rm docker rmi -f $(docker image ls --format '{{.Repository}} {{.ID}}' "pingidentity/*");
+  if [ -n "$(docker images 'pingidentity/*' -q|sort|uniq)" ]; then
+    run docker image rm docker rmi -f "$(docker image ls --format '{{.Repository}} {{.ID}}' "pingidentity/*")";
   else
     echo "***No Ping Identity images present to remove***"
   fi
@@ -155,9 +153,9 @@ din()
 {
   echo "Running command to: ${bold}Remove all Docker images${normal}";
   dip;
-  i=$( docker images --format '{{.ID}}' )
-  if [ ! -z "${i}" ]; then
-    run docker image rm ${i};
+  i="$( docker images --format '{{.ID}}' )"
+  if [ -n "${i}" ]; then
+    run docker image rm "${i}";
   else
     echo "***No images present to remove***"
   fi
@@ -199,7 +197,7 @@ alias ddc="dcp ; dvp ; dip; dnp"
 alias dnuke="docker system prune -af"
 
 ## kenv
-function kenv () 
+kenv () 
 {
   echo "
 kenv alias has been deprecated. Please use:
@@ -209,7 +207,7 @@ kenv alias has been deprecated. Please use:
 }
 
 ## khelp
-function khelp () 
+khelp () 
 {
 cat <<EOHELP
 +----------------------------------------------------------------------------+
@@ -263,13 +261,13 @@ EOHELP
 # kdelall [option]- delete all [option] (pods, deployments, services) in namespace
 
 ## kubernetes
-function k () {
+k () {
    _kubectlParams="$*"
    _kubeCTX=$(kubectl config current-context)
    _kubeNS=$(kubectl config view --minify --output 'jsonpath={..namespace}')
    _kubeNShelp=""
 
-   test ${_kubeNS} = "default" && _kubeNShelp=" (to set, use kubens {namespace})"
+   test "${_kubeNS}" = "default" && _kubeNShelp=" (to set, use kubens {namespace})"
 
    while true; do
       test -z "$1" && break
@@ -290,6 +288,7 @@ function k () {
    echo "  k8s Namespace: ${bold}${_kubeNS}${normal}${_kubeNShelp}"
    echo "--------------------------------------"
 
+   # shellcheck disable=SC2086
    kubectl $_kubectlParams
 }
 
@@ -317,14 +316,14 @@ alias klogs="k logs -f "
 ## kubernetes nodes aliases
 alias knl="k get nodes"
 
-function knuke() {
+knuke() {
   if ! test -z "${1}"; then
     ns="${1}"
   else
     ns="$(kubectl get sa default -o jsonpath='{.metadata.namespace}')"
   fi
   echo "Are you sure you want to force-delete EVERYTHING in namespace: ${ns}. y/n"
-  read nuke
+  read -r nuke
   if test "${nuke}" = "y" || test "${nuke}" = "yes"; then
     echo "${bold}deploy nuke${normal}";
     kubectl delete pods,configmaps,secrets,jobs,cronjobs,statefulsets,deployments,persistentvolumeclaims,services,ingresses -n "$(kubectl get sa default -o jsonpath='{.metadata.namespace}')" --grace-period=0 --force --all
@@ -334,7 +333,7 @@ function knuke() {
 }
 
 
-function kustfunc() {
+kustfunc() {
     _kubectlFunc="${1}"
 
     if ! test -z "${2}"; then
@@ -347,31 +346,31 @@ function kustfunc() {
 
     echo "Alias Expansion: ${bold}$_cmd ${normal}"
 
-    eval ${_cmd}
+    eval "${_cmd}"
 }
 
 alias kustapply="kustfunc apply"
 alias kustcreate="kustfunc create"
 alias kustdelete="kustfunc delete"
 
-function kpf () {
+kpf () {
   while true
   do
-    kubectl port-forward ${*}
+    kubectl port-forward "${*}"
   done
 }
 
-function kdelpo() {
+kdelpo() {
   echo "Running command to: ${bold}Delete all pods${normal}";
   kubectl delete pods --all --force --grace-period=0 -n "$(kubectl get sa default -o jsonpath='{.metadata.namespace}')"
 }
 
-function kdelall() {
+kdelall() {
   echo "Running command to: ${bold}Delete all ${1}${normal}";
   resource_types="pods|deployments|services|ingresses"
   case "${1}" in
     pods|deployments|services|ingresses)
-      kubectl delete ${1} --all --force --grace-period=0 -n "$(kubectl get sa default -o jsonpath='{.metadata.namespace}')"
+      kubectl delete "${1}" --all --force --grace-period=0 -n "$(kubectl get sa default -o jsonpath='{.metadata.namespace}')"
     ;;
     *)
       echo "please pass a parameter: $resource_types"
@@ -384,7 +383,7 @@ function kdelall() {
 ##############################################################################
 
 ## p1help
-function p1help () 
+p1help () 
 {
 cat <<EOP1HELP
 +----------------------------------------------------------------------------+
@@ -419,15 +418,16 @@ EOP1HELP
 }
 
 ## sourcePingIdentityFiles
-function sourcePingIdentityFiles () 
+sourcePingIdentityFiles () 
 {
-    test -f ~/.pingidentity/devops && \
-        . ~/.pingidentity/devops && \
-        export $(grep "^[A-Z]" ~/.pingidentity/devops | cut -d= -f1)
+    # shellcheck disable=SC1090
+    test -f "${HOME}/.pingidentity/devops" && \
+        . "${HOME}/.pingidentity/devops" && \
+        export "$(grep "^[A-Z]" ~/.pingidentity/devops | cut -d= -f1)"
 }
 
 ## p1env
-function p1env () 
+p1env () 
 {
     sourcePingIdentityFiles
 
@@ -442,14 +442,14 @@ cat <<EOP1ENV
 +-----------------------------------------------------------------------------------------+
     Auth URL: ${PING_ONE_AUTH_URL}
      API URL: ${PING_ONE_API_URL}
-  Auth Token: `grep "# Expires" ~/.pingidentity/p14c.access_token`
+  Auth Token: $(grep "# Expires" ~/.pingidentity/p14c.access_token)
 EOP1ENV
-    which pyjwt >/dev/null && pyjwt decode --no-verify ${PING_ONE_AUTH_TOKEN} | jq
+    which pyjwt >/dev/null && pyjwt decode --no-verify "${PING_ONE_AUTH_TOKEN}" | jq
     echo "+-----------------------------------------------------------------------------------------+"
 }
 
 ## _p14c
-function _p14c()
+_p14c()
 {
   _RESOURCE="$1"
   _ATTR="$2"
@@ -467,45 +467,46 @@ function _p14c()
     environments)
         ;;
     populations)
-        _URL+="/populations/${PING_ONE_POPULATION_ID}"
+        _URL="${_URL}/populations/${PING_ONE_POPULATION_ID}"
         ;;
     applications)
-        _URL+="/applications/${PING_ONE_CLIENT_ID}"
+        _URL="${_URL}/applications/${PING_ONE_CLIENT_ID}"
         ;;
     users)
-        _URL+="/users"
+        _URL="${_URL}/users"
         ;;
     *)
-        _URL+="${_RESOURCE}"
+        _URL="${_URL}${_RESOURCE}"
         ;;
   esac
-  test ! -z ${_ID} && _URL+="/${_ID}"
+  test ! -z "${_ID}" && _URL="${_URL}/${_ID}"
   # echo "PingOne For Customer URL: ${bold}$_URL ${normal}"
   curl -X GET -H "Authorization: Bearer $PING_ONE_AUTH_TOKEN" "${_URL}" \
-    2>/dev/null | jq $_JQ_OPT  
+    2>/dev/null | jq "$_JQ_OPT"  
 }
 
-function p1auth()
+p1auth()
 {
   sourcePingIdentityFiles
 
-  _AUTH=$( curl -X POST $PING_ONE_AUTH_URL/as/token \
+  _AUTH=$( curl -X POST "${PING_ONE_AUTH_URL}/as/token" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -d "grant_type=client_credentials&client_id=${PING_ONE_CLIENT_ID}&client_secret=${PING_ONE_CLIENT_SECRET}" \
     2> /dev/null )
 
-  _TOKEN=$( echo ${_AUTH} | jq -r '.access_token' ) 
-  _EXPIRES=$( echo ${_AUTH} | jq -r '.expires_in' ) 
+  _TOKEN=$( echo "${_AUTH}" | jq -r '.access_token' ) 
+  _EXPIRES=$( echo "${_AUTH}" | jq -r '.expires_in' ) 
  
   echo "########################################################################
 # Ping One Access Token
 #
-# Created: `date`
-# Expires: `date -v+${_EXPIRES}S`
+# Created: $(date)
+# Expires: $(date "-v+${_EXPIRES}S")
 ########################################################################
 PING_ONE_AUTH_TOKEN=$_TOKEN" > ~/.pingidentity/p14c.access_token
 
-  . ~/.pingidentity/p14c.access_token
+  # shellcheck disable=SC1090
+  . "${HOME}/.pingidentity/p14c.access_token"
 
   p1env
 }
