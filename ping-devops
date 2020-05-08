@@ -1651,7 +1651,7 @@ base64_no_newlines()
 
 #test -z "${1}" && usage
 
-_ping_devops_command="${1}" && shift
+_ping_devops_command="${1}" && shift $(( $# > 0 ? 1 : 0 ))
 
 test -z "${_ping_devops_command}" && usage
 test "${_ping_devops_command}" = "k8s" && _ping_devops_command="kubernetes"
