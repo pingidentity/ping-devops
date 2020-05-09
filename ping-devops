@@ -189,7 +189,7 @@ check_variables()
     && echo \
     && echo "Set this/these in your config with:" \
     && echo_green "  ping-devops config" \
-    && echo "" \
+    && echo \
     && exit
 }
 
@@ -275,7 +275,7 @@ usage_command()
       ;;
   esac
 
-  echo ""
+  echo
   exit
 }
 
@@ -415,12 +415,12 @@ devops_add_config()
   echo "${VAR_PROMPT}"
   echo "    [${GREEN}${CURRENT_VALUE}${NORMAL}] ? \c"
   read -r answer
-  echo ""
+  echo
 
   if test ! -z "${answer}"; then
     if test "${answer}" = "-"; then
       if test -z "${VAR_TO_SET}"; then
-        echo "" >> "${PROPS_FILE}"
+        echo >> "${PROPS_FILE}"
       else
         eval "unset \${VAR_TO_SET}"
 
@@ -560,12 +560,12 @@ echo "##########################################################################
 
     echo_info_variable PING_IDENTITY_DEVOPS_USER
     echo_info_variable PING_IDENTITY_DEVOPS_KEY
-    echo ""
+    echo
     echo_info_variable PING_IDENTITY_DEVOPS_HOME
     echo_info_variable PING_IDENTITY_DEVOPS_REGISTRY
-    echo ""
+    echo
     echo_info_variable PING_IDENTITY_DEVOPS_TAG
-    echo ""
+    echo
     echo_info_variable PING_IDENTITY_ACCEPT_EULA
 
 
@@ -682,7 +682,7 @@ print_topic()
       , (.[]|.|map(.) |@tsv)           # print data
       " | column -ts "$(printf '\t')"
       
-    echo ""
+    echo
   else
     echo_green "
 ################################################################################
@@ -706,8 +706,8 @@ print_topic()
     fi
 
     cat "${DEVOPS_WORK_DIR}/_${_topic}"
-    echo ""
-    echo ""
+    echo
+    echo
     echo_green "################################################################################"
   fi
 }
@@ -972,7 +972,7 @@ print_orchestration_usecase()
       grep "^#-" "${_usecase_file}"
   fi
 
-  echo ""
+  echo
 }
 
 
@@ -1099,7 +1099,7 @@ orchestration_command()
                     run_command "${DOCKER_COMPOSE} ${_docker_compose_options} pull"
                     run_command "${DOCKER_COMPOSE} ${_docker_compose_options} up --detach"
 
-                    echo ""
+                    echo
                     grep "^#-" "${_orch_file}"
                     echo "#  Additional Docker Commands
 #
@@ -1129,7 +1129,7 @@ orchestration_command()
 
                     cd - > /dev/null || echo_red "Unable to change to previous dir" || exit
 
-                    echo ""
+                    echo
                     grep "^#-" "${_orch_file}"
                     echo "#  Starting kubernetes deployment of '${_product}'
 #  
@@ -1174,11 +1174,11 @@ orchestration_command()
         clean)
             case "${_orchestrator}" in
                 docker)
-                    echo ""
+                    echo
                     echo "You are about to clean all the ping_devops images below..."
-                    echo ""
+                    echo
                     docker container ls -a --filter name=${_docker_compose_project_name}_*
-                    echo ""
+                    echo
                     echo_red "IMPORTANT: This is destructive of all content in these running containers.
         "
 
@@ -1205,15 +1205,15 @@ orchestration_command()
                     run_command "${DOCKER} container prune -f"
                     ;;
                 kubernetes)
-                    echo ""
+                    echo
                     echo "You are about to clean all the kubernetes resources below..."
-                    echo ""
+                    echo
                     echo "################################################################################"
                     echo "#    Kubernetes Context: ${GREEN}${CURRENT_K8S_CONTEXT}${NORMAL}"
                     echo "#  Kubernetes Namespace: ${GREEN}${CURRENT_K8S_NAMESPACE}${NORMAL}"
                     echo "################################################################################"
                     kubectl get all
-                    echo ""
+                    echo
                     echo_red "IMPORTANT: This is destructive of all content in these running containers.
         "
 
@@ -1227,7 +1227,7 @@ orchestration_command()
                         run_command "kubectl delete pods,statefulsets,deployments,services -n ${CURRENT_K8S_NAMESPACE} --grace-period=0 --force --all"
                     fi
 
-                    echo ""
+                    echo
                     echo "################################################################################"
                     echo "#    All pods, statefulsets, deployments and services have been deleted."
                     echo "#    To perform a deep clean on all other kubernetes in your workspace use"
@@ -1264,7 +1264,7 @@ devops_config()
 
         # If the config is broken (i.e. ctrl-c) then restore the previous file
         trap '
-            echo ""
+            echo
             echo "restoring: ${DEVOPS_FILE}"
             mv "${DEVOPS_FILE}".prev "${DEVOPS_FILE}"
             exit
