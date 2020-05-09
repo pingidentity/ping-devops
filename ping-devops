@@ -660,62 +660,55 @@ print_topic()
   fi
 
   if test -z "${_topic}"; then
-      echo_green "
+    echo_green "
 ################################################################################
 #          Ping Identity DevOps Topics
 ################################################################################
 "
 
-      # Parses the TOPICS_JSON which comes from github as a json document
-      
-      # shellcheck disable=SC2002
-      cat "${PING_DEVOPS_TOPICS_JSON}" | jq -r "
-          [.[]
-
-          # Map column names to data
-          | {
-              Topic: .name
+    # Print the TOPICS_JSON (which comes from github) as a table
+    < "${PING_DEVOPS_TOPICS_JSON}" jq -r "
+      [ .[]
+        # Map column names to data
+        | {              
+            Topic: .name
           }
-          ]
+      ]
+      # lowercase keys (for predictable sorting, optional)
+      | [ .[] | with_entries( .key |= ascii_upcase ) ]
 
-          # lowercase keys
-          # (for predictable sorting, optional)
-          |  [.[]| with_entries( .key |= ascii_upcase ) ]
-
-          # print headers
-          | (.[0] |keys_unsorted | @tsv)
-
-          # print data
-            , (.[]|.|map(.) |@tsv)                       # print table
-
-          "  | tr '\t' '|' | column -t -s '|'
-          echo ""
+      # print table
+      | (.[0] |keys_unsorted | @tsv)   # print header
+      , (.[]|.|map(.) |@tsv)           # print data
+      " | column -ts "$(printf '\t')"
+      
+    echo ""
   else
-      echo_green "
+    echo_green "
 ################################################################################
 #          Ping Identity DevOps Topic: ${_topic}
 ################################################################################
 "
-      # Pull the topic from the topics location
-      ${CURL} "${PING_DEVOPS_TOPICS_URL}/${_topic}" \
-                  --output "${DEVOPS_WORK_DIR}/_${_topic}" \
-                  --fail 2>/dev/null
+    # Pull the topic from the topics location
+    ${CURL} "${PING_DEVOPS_TOPICS_URL}/${_topic}" \
+                --output "${DEVOPS_WORK_DIR}/_${_topic}" \
+                --fail 2>/dev/null
 
-      _curl_result=$?
+    _curl_result=$?
 
-      if test ${_curl_result} -ne 0; then
-          echo "Unable to retrieve topic '${_topic}'."
-          echo
-          echo "To get a list of topics:"
-          echo_green "  ping-devops topic"
-          echo 
-          exit 1
-      fi
+    if test ${_curl_result} -ne 0; then
+      echo "Unable to retrieve topic '${_topic}'."
+      echo
+      echo "To get a list of topics:"
+      echo_green "  ping-devops topic"
+      echo 
+      exit 1
+    fi
 
-      cat "${DEVOPS_WORK_DIR}/_${_topic}"
-      echo ""
-      echo ""
-      echo_green "################################################################################"
+    cat "${DEVOPS_WORK_DIR}/_${_topic}"
+    echo ""
+    echo ""
+    echo_green "################################################################################"
   fi
 }
 
