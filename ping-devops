@@ -665,9 +665,8 @@ print_topic()
 #          Ping Identity DevOps Topics
 ################################################################################
 "
-
     # Print the TOPICS_JSON (which comes from github) as a table
-    < "${PING_DEVOPS_TOPICS_JSON}" jq -r "
+    jq -r < "${PING_DEVOPS_TOPICS_JSON}" "
       [ .[]
         # Map column names to data
         | {              
@@ -940,36 +939,29 @@ print_orchestration_usecase()
   _usecase_file="${3}"
 
   if test -z "${_product_usecase}"; then
-      echo_green "
+    echo_green "
 ################################################################################
 #          Available ping-devops ${_orchestation} usecase/products
 ################################################################################
 "
-
-      # shellcheck disable=SC2002
-      cat "${PING_DEVOPS_JSON}" | jq -r "
-          [.${_orchestation}.usecases | .[]
-
-          # Map column names to data
-          | {
-              Name: .name,
-              Description: .description
+    jq -r < "${PING_DEVOPS_JSON}" "
+      [.${_orchestation}.usecases 
+        | .[]
+        # Map column names to data
+        | {
+            Name: .name,
+            Description: .description
           }
-          ]
+      ]
+      # lowercase keys (for predictable sorting, optional)
+      | [ .[] | with_entries( .key |= ascii_upcase ) ]
 
-          # lowercase keys
-          # (for predictable sorting, optional)
-          |  [.[]| with_entries( .key |= ascii_upcase ) ]
-
-          # print headers
-          | (.[0] |keys_unsorted | @tsv)
-
-          # print data
-            , (.[]|.|map(.) |@tsv)                       # print table
-
-          "  | tr '\t' '|' | column -t -s '|'
+      # print table
+      | (.[0] |keys_unsorted | @tsv)   # print header
+      , (.[]|.|map(.) |@tsv)           # print data
+      " | column -ts "$(printf '\t')"
   else
-      grep "^#-" "${_usecase_file}"
+    grep "^#-" "${_usecase_file}"
   fi
 
   echo
@@ -1041,12 +1033,9 @@ orchestration_command()
     #   - usecase path
     if test ! -z "${_product}"; then
         mkdir -p "${DEVOPS_WORK_DIR}/${_product}"
-        # shellcheck disable=SC2002
-        _info_base_url=$(cat "${PING_DEVOPS_JSON}" | jq -r ".baseURL")
-        # shellcheck disable=SC2002
-        _kust_base_url=$(cat "${PING_DEVOPS_JSON}" | jq -r ".baseKustomizeURL")
-        # shellcheck disable=SC2002
-        _usecase_path=$(cat "${PING_DEVOPS_JSON}" | jq -r ".${_orchestrator}.usecases[] | select ( [.name] == [\"${_product}\"]) | .path")
+        _info_base_url=$(jq -r < "${PING_DEVOPS_JSON}" ".baseURL" )
+        _kust_base_url=$(jq -r < "${PING_DEVOPS_JSON}" ".baseKustomizeURL" )
+        _usecase_path=$(jq -r < "${PING_DEVOPS_JSON}" ".${_orchestrator}.usecases[] | select ( [.name] == [\"${_product}\"]) | .path")
         
         #
         # If we have a usecase path found, then we will create the URLs
@@ -1070,7 +1059,7 @@ orchestration_command()
           _curl_result=1
         fi
         
-        # If we can't find a kustomization.yaml, then we will change the command to info
+        # If we can't find an orchestration file, then we will change the command to info
         # and provide a message that we can't download info for the product.
         if test ${_curl_result} -ne 0; then
             rm -rf "${DEVOPS_WORK_DIR:?}/${_product}"  # :? will cause command to fail
@@ -1145,11 +1134,8 @@ orchestration_command()
 #  Port Forward - HTTP Access - kubectl port-forward service/{service-name} {port}
 ################################################################################
 "
-
                     ;;
             esac
-
-
             ;;
         stop|rm)
             case "${_orchestrator}" in
@@ -1214,9 +1200,8 @@ orchestration_command()
                     echo "################################################################################"
                     kubectl get all
                     echo
-                    echo_red "IMPORTANT: This is destructive of all content in these running containers.
-        "
-
+                    echo_red "IMPORTANT: This is destructive of all content in these running containers."
+                    echo
                     echo "Are you SURE you want to clean these kubernetes resources (y/n) [n] ? \c"
                     read -r answer
 
