@@ -50,7 +50,7 @@ PING_DEVOPS_STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.6.2"
+VERSION="0.6.4"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -91,18 +91,14 @@ test -d "${DOT_PINGIDENTITY}" || mkdir -p "${DOT_PINGIDENTITY}"
 # shellcheck disable=SC1090
 test -f "${DEVOPS_FILE}" && . "${DEVOPS_FILE}"
 
-# Temporary directories used to run generate-profile and download product
-PROFILE_DIR=""
-PROD_DIR=""
+# Temporary directory used throughout script and cleaned up at exit
 TMP_DIR="$(mktemp -d)"
 
 ################################################################################
 # cleanup - Ensures that we cleanup any temporary directories we create upon exit
 ################################################################################
 cleanup ()
-{      
-  rm -rf "$PROFILE_DIR"   
-  rm -rf "$PROD_DIR"
+{
   rm -rf "$TMP_DIR"
 }
 
@@ -904,286 +900,6 @@ data:
 }
 
 ################################################################################
-# generate_profile (arguments)
-#
-# Generates a profile for the provided arguments:
-#  - product
-#  - current-install {directory}     (optional)
-#  - generated-profile {directory}   (optional)
-#  - variables-file {file}           (optional)
-################################################################################
-generate_profile()
-{
-    _product="${1}"
-    shift
-    while ! test -z "${1}" ; do
-        case "${1}" in
-            --current-install)
-                shift
-                _currentInstall="${1}"
-                ;;
-            --generated-profile)
-                shift
-                _generatedProfile="${1}"
-                ;;
-            --variables-file)
-                shift
-                #_variablesFile="${1}"
-                usage "--variables-file option not implemented yet"
-                ;;
-            *)
-                usage "Unknown generate-profile option '${1}'"
-                ;;
-        esac
-        shift
-    done
-
-    test -z "${_generatedProfile}" && _generatedProfile="${CWD}/${_product}"
-    
-    test -d "${_generatedProfile}" && 
-        usage "Generated Profile directory '${_generatedProfile}' not empty" 
-
-    echo "
-################################################################################
-#   Ping DevOps Server Profile Generation
-################################################################################
-"
-
-    PROFILE_DIR=$(mktemp -d)
-    if test -z "${PROFILE_DIR}" || test ! -d "${PROFILE_DIR}"; then
-      usage "Could not create temp dir using mktemp."
-    fi
-
-    PROD_DIR=$(mktemp -d)
-    if test -z "${PROD_DIR}" || test ! -d "${PROD_DIR}"; then
-      usage "Could not create raw dir using mktemp." 
-    fi
-
-    if test -z "${_currentInstall}" ; then
-      echo "No current install provided."
-      echo "  ==> Using 'docker run ${PING_IDENTITY_DEVOPS_REGISTRY}/pingdownloader -p ${_product}"
-      echo "  ==> to pull down the latest bits for ${_product}"
-
-      check_for_tool $DOCKER
-      $DOCKER run --rm -v /tmp:/tmp "${PING_IDENTITY_DEVOPS_REGISTRY}/pingdownloader" \
-          --product "${_product}" \
-          --devops-user "${PING_IDENTITY_DEVOPS_USER}" \
-          --devops-key "${PING_IDENTITY_DEVOPS_KEY}" \
-          --devops-app "ping-devops-generate-profile-${_product}"
-      _dockerRunResult=$?
-
-      test $_dockerRunResult -ne 0 && usage "Unable to download product via docker (result=$_dockerRunResult)" 
-      
-      unzip -q /tmp/product.zip -d "${PROD_DIR}"
-      
-      _currentInstall="${PROD_DIR}/PingDirectory"
-
-      rm /tmp/product.zip
-    fi
-    
-    test ! -d "${_currentInstall}" && 
-        usage "Current Install '${_currentInstall}' not found" 
-
-    case "${_product}" in
-        pingdirectory)
-            generate_server_profile_pingdirectory "${_currentInstall}"
-            ;;
-        pingaccess|pingdatagovernance|pingdatasync|pingfederate)
-            usage "Not implemented for product '${_product}'."
-            ;;
-        *)
-            usage "Unknown product '${_product}'."
-            ;;
-    esac
-} 
-
-################################################################################
-# generate_server_profile_pingdirectory ()
-#
-# Generates a server profile for Ping Directory
-################################################################################
-generate_server_profile_pingdirectory()
-{
-    _serverRoot="${1}"
-
-    # Validate that we have an actual PingDirectory install with the manage-profile
-    # binary
-    test ! -x "${_serverRoot}/bin/manage-profile" && \
-        usage "Unable to find manage-profile in product."
-
-    cd "${PROFILE_DIR}" || echo_red "Unable to cd to '${PROFILE_DIR}'" || exit
-
-    # Create a directory to generate a profile into
-    mkdir pd.profile
-    "${_serverRoot}/bin/manage-profile generate-profile" --profileRoot pd.profile >/dev/null
-
-
-    # Create a secrets directory where we will place some password files.
-    mkdir secrets
-    echo "What initial passwords would you like to set in your generated profile for the:"
-    echo "   ROOT_USER      - Password used for your root dn (i.e cn=administrator)"
-    echo "   ADMIN_USER     - Password used with your administrative framework (i.e. dsreplication)"
-    echo "   ENCRYPTION     - Password used to encrypt your encryption settings"
-    echo ""
-    echo "These will be placed into seperate password files and referenced in an env_vars file at the"
-    echo "top of your generated profile.  For better security, these should be placed into a secret"
-    echo "or vault, mounted into your container and refrenced by your env_vars location."
-    echo ""
-
-    # shellcheck disable=SC2002
-    _randomPassword="$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9@%^_+?~' | fold -w 12 | head -c 12)"
-    devops_add_config "secrets/root-user-pwd"  "" "$_randomPassword" "Initial ROOT_USER_PASSWORD? "
-    devops_add_config "secrets/admin-user-pwd" "" "$_randomPassword" "Initial ADMIN_USER_PASSWORD? "
-    devops_add_config "secrets/encryption-pwd" "" "$_randomPassword" "Initial ENCRYPTION_PASSWORD? "
-
-    #
-    # env_vars File
-    #
-    # Pull several arguments in the generated setup-arguments.txt file create the proper
-    # environment variables
-    _setupArgs="pd.profile/setup-arguments.txt"
-    echo "
-# Generated by 
-#    ping-devops generate-profile pingdirectory
-#
-# on $(date)
-#
-# The following environment variables are used by the
-# Ping Identity Ping Directory image.
-#
-ROOT_USER_PASSWORD_FILE=\${STAGING_DIR}/secrets/root-user-pwd
-ADMIN_USER_PASSWORD_FILE=\${STAGING_DIR}/secrets/admin-user-pwd
-ENCRYPTION_PASSWORD_FILE=\${STAGING_DIR}/secrets/encryption-pwd
-
-ROOT_USER_DN=$(find_setup_arg_value  "--rootUserDN"  ${_setupArgs}  "cn=administrator")
-USER_BASE_DN=$(find_setup_arg_value  "--baseDN"      ${_setupArgs}  "dc=example,dc=com")
-LDAP_PORT=$(find_setup_arg_value     "--ldapPort"    ${_setupArgs}  "389")
-LDAPS_PORT=$(find_setup_arg_value    "--ldapsPort"   ${_setupArgs}  "636")
-HTTPS_PORT=$(find_setup_arg_value    "--httpsPort"   ${_setupArgs}  "443")
-MAX_HEAP_SIZE=$(find_setup_arg_value "--maxHeapSize" ${_setupArgs}  "384m")
-LOCATION=$(find_setup_arg_value      "--location"    ${_setupArgs}  "home")
-
-" > env_vars
-
-    mv pd.profile/setup-arguments.txt setup-arguments.txt-FROM-SOURCE
-
-    #
-    # docker-compose.yaml File
-    #
-    echo "
-# Ping Identity ping-devops generate-profile
-#
-# Generated on $(date)
-#
-version: \"3.1\"
-# This docker-compose.yaml was generated by 'ping-devops' tool on $(date)
-
-services:
-  pingdirectory:
-    image: \${PING_IDENTITY_DEVOPS_REGISTRY}/pingdirectory:\${PING_IDENTITY_DEVOPS_TAG}
-    container_name: pingdirectory
-    environment:
-      #- SERVER_PROFILE_URL=...url of your git repo...and comment out the volumes /opt/in...
-      #- SERVER_PROFILE_PATH=...path in your git repo...
-      - PING_IDENTITY_ACCEPT_EULA=YES
-      - ORCHESTRATION_TYPE=compose
-      - COMPOSE_SERVICE_NAME=pingdirectory_service
-    env_file:
-      # Configuration file created when setup.sh (Getting-started project root directory) is first run to source
-      # devops user/key details for evaluation licenses and for docker image/git tags
-      - ${PRINT_DEVOPS_FILE}
-    # Example: Examples below for mounting local directories for inbound server profile and persisting
-    #          server build.  The local /opt/out directory must be empty when building new server
-    #             /opt/out - Resulting server build
-    #             /opt/in  - Inbound server-profile detail in liue of SERVER_PROFILE_URL (must be commented out)
-    volumes:
-    #   - \${HOME}/projects/devops/volumes/pingdirectory_service:/opt/out
-       - ${_generatedProfile}:/opt/in
-    networks:
-      - pingnet
-    ulimits:
-      nproc:
-        soft: 16384
-        hard: 16384
-      nofile:
-        soft: 65535
-        hard: 65535
-    ports:
-      - 1389-1399:389
-      - 1636-1646:636
-      - 1443-1453:443
-      
-  pingdataconsole:
-    image: \${PING_IDENTITY_DEVOPS_REGISTRY}/pingdataconsole:\${PING_IDENTITY_DEVOPS_TAG}
-    container_name: pingdataconsole
-    ports:
-      - 8443:8443
-    networks: 
-      - pingnet
-                    
-networks:
-    pingnet:
-
-" > docker-compose.yaml
-
-    #
-    # README.md File
-    #
-    echo "
-# Ping Directory Server Profile
-
-Generated by \`ping-devops\` tool on $(date)
-* Product: ${_product}
-* Current Install: ${_currentInstall}
-* Generated Profile: ${_generatedProfile}
-
-# Testing with docker-compose
-## Starting up image
-
-    cd ${_generatedProfile}
-    docker-compose up -d
-
-## Watching PingDirectory Logs
-
-    docker logs -f ${_product}
-
-## Running PingDataconsole
-
-https://localhost:8443
-  Username: administrator
-  Password: $(cat "${PROFILE_DIR}/secrets/root-user-pwd")
-
-" > README.md
-
-    #
-    # motd File
-    #
-    echo "
-This server profile was generated by 'ping-devops' tool on $(date)
-
-Source Product
-==============
-$("${_serverRoot}/bin/status" -V)
-" > motd
-
-    mkdir -p "${_generatedProfile}"
-
-    mv ./* "${_generatedProfile}/."
-
-    echo
-    echo "######################## README.md ############################"
-    
-    which mdcat >/dev/null
-    _whichResult=$?
-
-    if test $_whichResult -eq 0; then
-      mdcat "${_generatedProfile}/README.md"
-    else
-      cat "${_generatedProfile}/README.md"
-    fi
-}
-
-################################################################################
 # get_ping_devops_json
 #
 ################################################################################
@@ -1670,13 +1386,6 @@ case "${_ping_devops_command}" in
         _params="${*}"
 
         generate_resource "${_resource}" "${_params}"
-        ;;
-
-    generate-profile)
-        _product="${1}"
-        _params="${*}"
-
-        generate_profile "${_product}" "${_params}"
         ;;
 
     docker|kubernetes)
