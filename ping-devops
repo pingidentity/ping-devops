@@ -50,7 +50,7 @@ PING_DEVOPS_STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.6.5"
+VERSION="0.6.6"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -1335,7 +1335,7 @@ base64_no_newlines()
     # shellcheck disable=SC2002
     cat "${1}" | $BASE64 | tr -d '\r?\n'
   else
-    echo "${1}" | $BASE64 | tr -d '\r?\n'
+    echo "${1}\c" | $BASE64 | tr -d '\r?\n'
   fi
 }
 
