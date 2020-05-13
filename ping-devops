@@ -60,6 +60,8 @@ DEVOPS_FILE="${DOT_PINGIDENTITY}/devops"
 PRINT_DEVOPS_FILE="${HOME}/.pingidentity/devops"
 DEVOPS_WORK_DIR="${DOT_PINGIDENTITY}/ping-devops"
 test -d "${DEVOPS_WORK_DIR}" || mkdir -p "${DEVOPS_WORK_DIR}"
+TOPICS_DIR="${DEVOPS_WORK_DIR}/topics"
+test -d "${TOPICS_DIR}" || mkdir -p "${TOPICS_DIR}"
 
 ################################################################################
 # Ping DevOps URL & Info
@@ -70,7 +72,7 @@ PING_DEVOPS_JSON="${DEVOPS_WORK_DIR}/.ping-devops.json"
 PING_DEVOPS_GITHUB_CONTENT="https://raw.githubusercontent.com/pingidentity/pingidentity-devops-getting-started/master"
 PING_DEVOPS_TOPICS_URL="${PING_DEVOPS_GITHUB_CONTENT}/docs/ping-devops/topics"
 PING_DEVOPS_TOPICS_JSON_URL="https://api.github.com/repos/pingidentity/pingidentity-devops-getting-started/contents/docs/ping-devops/topics"
-PING_DEVOPS_TOPICS_JSON="${DEVOPS_WORK_DIR}/topics.json"
+PING_DEVOPS_TOPICS_JSON="${TOPICS_DIR}/topics.json"
 PING_DEVOPS_MOTD_URL="${PING_DEVOPS_GITHUB_CONTENT}/docs/ping-devops/motd"
 PING_DEVOPS_MOTD="${DEVOPS_WORK_DIR}/motd"
 
@@ -221,6 +223,7 @@ ${GREEN}General Usage:${NORMAL}
   ping-devops config                            # Configure Ping DevOps
   ping-devops info [-v]                         # Print Config Information
   ping-devops version                           # Version Details and Check
+  ping-devops clean                             # Remove ~/.pingidentity/ping-devops
   ping-devops topic [ {topic-name} ]            # Short Help Topics
 
 ${GREEN}Generate Kubernetes/Kustomize/License Resources:${NORMAL}
@@ -609,6 +612,7 @@ to update, you can use:
   macosx : brew upgrade ping-devops
   linux  : curl -L https://bit.ly/ping-devops-install | bash"
 }
+
 ################################################################################
 # ping_devops_version ()
 #
@@ -636,6 +640,28 @@ ping_devops_version()
     fi
 
     echo "ping-devops version ${_version_msg}"
+}
+
+################################################################################
+# ping_devops_clean ()
+#
+# Cleans the ~/.pingidentity/ping-devops
+################################################################################
+ping_devops_clean()
+{
+
+    echo
+    echo_red "IMPORTANT: This is destructive of all content ~/.pingidentity/ping-devops"
+    echo
+    echo "Are you SURE you want to clean/remove this content (y/n) [n] ? \c"
+    read -r answer
+
+    if [ "${answer}" != "Y" ] && [ "${answer}" != "y" ]; then
+        echo_error "Clean Aborted!"
+        exit
+    fi
+
+    rm -rf "${DEVOPS_WORK_DIR}"
 }
 
 ################################################################################
@@ -690,7 +716,7 @@ print_topic()
 "
     # Pull the topic from the topics location
     ${CURL} "${PING_DEVOPS_TOPICS_URL}/${_topic}" \
-                --output "${DEVOPS_WORK_DIR}/_${_topic}" \
+                --output "${TOPICS_DIR}/${_topic}" \
                 --fail 2>/dev/null
 
     _curl_result=$?
@@ -704,7 +730,7 @@ print_topic()
       exit 1
     fi
 
-    cat "${DEVOPS_WORK_DIR}/_${_topic}"
+    cat "${TOPICS_DIR}/${_topic}"
     echo
     echo
     echo_green "################################################################################"
@@ -1395,6 +1421,11 @@ case "${_ping_devops_command}" in
         _params="${*}"
 
         ping_devops_version "${_params}"
+        ;;
+    clean)
+        _params="${*}"
+
+        ping_devops_clean "${_params}"
         ;;
     *)
         usage "Unknown ping-devops command '${_ping_devops_command}'"
