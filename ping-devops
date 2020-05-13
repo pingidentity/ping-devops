@@ -50,7 +50,7 @@ PING_DEVOPS_STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.6.6"
+VERSION="0.6.7"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -341,7 +341,7 @@ add_bash_aliases()
 
     grep "${PING_DEVOPS_BASH_PROFILE}" "${BASH_PROFILE}" > /dev/null
 
-    if test "${?}" == "1"; then
+    if test "${?}" = "1"; then
         echo "
 ################################################################################
 #                         Ping Identity DevOps Alias Files
@@ -985,6 +985,9 @@ orchestration_command()
     check_devops_file
     check_for_tool $JQ
 
+    # Example ~/.pingidentity/ping-devops/compose/pingdirectory
+    _orch_dir="${DEVOPS_WORK_DIR}/${_orchestrator}"
+
     case "${_orchestrator}" in
         docker)
             check_for_tool $DOCKER
@@ -1032,7 +1035,7 @@ orchestration_command()
     #   - BaseURL for kustomize URL
     #   - usecase path
     if test ! -z "${_product}"; then
-        mkdir -p "${DEVOPS_WORK_DIR}/${_product}"
+        mkdir -p "${_orch_dir}/${_product}"
         _info_base_url=$(jq -r < "${PING_DEVOPS_JSON}" ".baseURL" )
         _kust_base_url=$(jq -r < "${PING_DEVOPS_JSON}" ".baseKustomizeURL" )
         _usecase_path=$(jq -r < "${PING_DEVOPS_JSON}" ".${_orchestrator}.usecases[] | select ( [.name] == [\"${_product}\"]) | .path")
@@ -1045,7 +1048,7 @@ orchestration_command()
           _info_url="${_info_base_url}/${_usecase_path}/${_orch_file}"
           _kust_url="${_kust_base_url}/${_usecase_path}"
 
-          _orch_file="${DEVOPS_WORK_DIR}/${_product}/${_orch_file}"
+          _orch_file="${_orch_dir}/${_product}/${_orch_file}"
           _docker_compose_options="--file ${_orch_file} --project-name ${_docker_compose_project_name}"
 
 
@@ -1062,7 +1065,7 @@ orchestration_command()
         # If we can't find an orchestration file, then we will change the command to info
         # and provide a message that we can't download info for the product.
         if test ${_curl_result} -ne 0; then
-            rm -rf "${DEVOPS_WORK_DIR:?}/${_product}"  # :? will cause command to fail
+            rm -rf "${_orch_dir:?}/${_product}"  # :? will cause command to fail
             echo_red "Unable to download info for '${_product}'"
             test ! -z "${_info_url}" && echo_red "  URL: ${_info_url}"
             _cmd="info"
@@ -1177,16 +1180,13 @@ orchestration_command()
                     fi
 
                     # shellcheck disable=SC2045
-                    for _prod_option in $(ls -d "${DEVOPS_WORK_DIR}/*" 2>/dev/null); do
-                        test -d "${_prod_option}" || break
+                    for _docker_compose_dir in $(ls -d "${_orch_dir}"/* 2>/dev/null); do
+                        test -f "${_docker_compose_dir}/${_orch_file}" || continue
 
-                        _docker_compose_dir="${DEVOPS_WORK_DIR}/$(basename "${_prod_option}" )"
-                        _docker_compose_options="--file ${_docker_compose_dir}/docker-compose.yaml --project-name ${_docker_compose_project_name}"
+                        _docker_compose_options="--file ${_docker_compose_dir}/${_orch_file} --project-name ${_docker_compose_project_name}"
 
                         echo "Cleaning up ${_prod_option}"
                         run_command "${DOCKER_COMPOSE} ${_docker_compose_options} down "
-
-                        rm -rf "${_docker_compose_dir}"
                     done
                     run_command "${DOCKER} container prune -f"
                     ;;
@@ -1223,6 +1223,10 @@ orchestration_command()
                     
                     ;;
             esac
+            
+            echo "Cleaning/Removing ${_orch_dir}"
+
+            rm -rf "${_orch_dir}"
             ;;
         *)
             usage_command "${_orchestrator}" "Unknown ${_orchestrator} command"
