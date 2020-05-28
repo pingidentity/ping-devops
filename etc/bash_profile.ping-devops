@@ -101,8 +101,8 @@ alias dps="run docker ps"
 dsa() 
 { 
   echo "Running command to: ${bold}Stop all running containers${normal}";
-  if ! test -z "$(docker container ls -a -q)" ; then
-    docker container stop "$(docker container ls -a -q)"
+  if ! test -z $(docker container ls -a -q) ; then
+    docker container stop $(docker container ls -a -q)
   else
     echo "No containers found to stop"
   fi
@@ -112,8 +112,8 @@ dsa()
 dra() 
 {
   echo "Running command to: ${bold}Remove all stopped containers${normal}";
-  if ! test -z "$(docker container ls -a -q)" ; then
-    docker container rm "$(docker container ls -a -q)"
+  if ! test -z $(docker container ls -a -q) ; then
+    docker container rm $(docker container ls -a -q)
   else
     echo "No containers found to remove"
   fi
@@ -143,7 +143,7 @@ diw()
   echo "Running command to: ${bold}Remove all Ping Identity Docker images${normal}";
   dip;
   if [ -n "$(docker images 'pingidentity/*' -q|sort|uniq)" ]; then
-    run docker image rm docker rmi -f "$(docker image ls --format '{{.Repository}} {{.ID}}' "pingidentity/*")";
+    run docker image rm docker rmi -f $(docker image ls --format '{{.Repository}} {{.ID}}' "pingidentity/*")
   else
     echo "***No Ping Identity images present to remove***"
   fi
