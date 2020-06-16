@@ -293,7 +293,7 @@ k () {
 }
 
 ## kubernetes general aliases
-alias kall="k get pods,svc,deploy,rs,job,ing,pvc"
+alias kall="k get pods,svc,deploy,rs,sts,job,ing,pvc"
 
 alias kget="k get"
 alias kg="kget"
