@@ -24,6 +24,7 @@ ENVSUBST="envsubst"
 DOCKER="docker"
 DOCKER_COMPOSE="docker-compose"
 CURL="curl -sL "
+VAULT="vault"
 #
 # In addition, the assumption is that kubectl is configured to authenticate and apply manifests to the Kubernetes
 # cluster. For EKS clusters, this requires an AWS key and secret with the appropriate IAM policies to be configured and
@@ -33,9 +34,9 @@ CURL="curl -sL "
 #    ping-devops topic devops-variables
 ########################################################################################################################
 
-CWD=$(pwd) 
+CWD=$(pwd)
 # shellcheck disable=SC2164
-cd "$( dirname "${0}" )"
+# cd "$( dirname "${0}" )"
 #THIS="$( basename "${0}" )"
 #THIS_DIR=`pwd`
 
@@ -45,7 +46,10 @@ PING_DEVOPS_STANDARD_VARIABLES="
   PING_IDENTITY_DEVOPS_HOME
   PING_IDENTITY_DEVOPS_REGISTRY
   PING_IDENTITY_DEVOPS_TAG
-  PING_IDENTITY_ACCEPT_EULA"
+  PING_IDENTITY_ACCEPT_EULA
+  VAULT_ADDR
+  VAULT_CACERT
+  VAULT_SECRET_PREFIX"
 
 ################################################################################
 # Version Info
@@ -154,9 +158,9 @@ run_command()
 {
   CMD="${1}"
   CMD_OUTPUT="${2}"
-  
+
   banner "Command: ${BOLD}$CMD $(test ! -z "${CMD_OUTPUT}" && echo "> ${CMD_OUTPUT}")${NORMAL}"
-  
+
   test -z "${CMD_OUTPUT}" && $CMD
   test ! -z "${CMD_OUTPUT}" && $CMD > "${CMD_OUTPUT}"
 }
@@ -198,11 +202,58 @@ check_variables()
 
 ################################################################################
 USAGE_HEADER="${GREEN}################################################################################
-#  Ping Identity DevOps (version $VERSION)"
+#  Ping Identity DevOps (version $VERSION)
+#
+#  Documentation: https://pingidentity-devops.gitbook.io/devops/
+#   GitHub Repos: https://github.com/topics/ping-devops
+################################################################################${NORMAL}"
 
 ################################################################################
 USAGE_FOOTER="${GREEN}Further help:${NORMAL}
   https://github.com/pingidentity/ping-devops"
+
+################################################################################
+USAGE_GENERAL="${GREEN}General Usage:${NORMAL}
+  ping-devops config                            # Configure Ping DevOps
+  ping-devops info [-v]                         # Print Config Information
+  ping-devops version                           # Version Details and Check
+  ping-devops clean                             # Remove ~/.pingidentity/ping-devops
+  ping-devops topic [ {topic-name} ]            # Short Help Topics"
+
+################################################################################
+USAGE_GENERATE="${GREEN}Generate Kubernetes/Kustomize/License Resources:${NORMAL}
+  ping-devops generate devops-secret                    # Ping DevOps secret
+  ping-devops generate tls-secret {domain}              # TLS Cert/Key (i.e. example.com)
+  ping-devops generate ssh-id-secret {ssh id_rsa file}  # SSH ID Key (i.e. ~/.ssh/id_rsa)
+  ping-devops generate license {product}                # Eval license file for product
+  ping-devops generate license-secret {license file}    # License secret from license file
+  ping-devops generate kustomization.yaml               # Skeleton kustomization.yaml"
+
+################################################################################
+USAGE_DOCKER_K8S_SUMMARY="${GREEN}Running Docker/Kubernetes Evironments:${NORMAL}
+  ping-devops docker     [info|start|stop|rm|clean]
+  ping-devops kubernetes [info|start|rm|clean]"
+
+USAGE_VAULT="${GREEN}Hashicorp Vault:${NORMAL}
+  ping-devops vault get-token                   # Get vault token for cli commands
+  ping-devops vault create-annotations {secret} # Create kubernetes annotaions for secret"
+
+################################################################################
+USAGE_DOCKER_DETAIL="${GREEN}Running Docker Getting Started Containers:${NORMAL}
+  ping-devops docker info                      # Lists all available use-cases/products
+  ping-devops docker info  {product}           # Information on user-case/product
+  ping-devops docker start {product}           # Starts services  (i.e. docker-compose up)
+  ping-devops docker stop  {product}           # Stops services   (i.e. docker-compose stop)
+  ping-devops docker rm    {product}           # Removes services (i.e. docker-compose down)
+  ping-devops docker clean                     # Cleans all ping_devops docker services"
+
+################################################################################
+USAGE_KUBERNETES_DETAIL="${GREEN}Running Kubernetes Getting Started Containers:${NORMAL}
+  ping-devops kubernetes info                  # Lists all available use-cases/products
+  ping-devops kubernetes info  {product}       # Information on user-case/product
+  ping-devops kubernetes start {product}       # Starts services  (i.e. kubectl create)
+  ping-devops kubernetes rm    {product}       # Removes services (i.e. kubectl delete)
+  ping-devops kubernetes clean                 # Removes all ping_devops kubernetes resources"
 
 
 ################################################################################
@@ -213,33 +264,18 @@ usage()
   echo_error "$*"
 
   echo "$USAGE_HEADER"
-
-  echo "#
-#  Documentation: https://pingidentity-devops.gitbook.io/devops/
-#   GitHub Repos: https://github.com/topics/ping-devops
-################################################################################${NORMAL}
-
-${GREEN}General Usage:${NORMAL}
-  ping-devops config                            # Configure Ping DevOps
-  ping-devops info [-v]                         # Print Config Information
-  ping-devops version                           # Version Details and Check
-  ping-devops clean                             # Remove ~/.pingidentity/ping-devops
-  ping-devops topic [ {topic-name} ]            # Short Help Topics
-
-${GREEN}Generate Kubernetes/Kustomize/License Resources:${NORMAL}
-  ping-devops generate devops-secret                    # Ping DevOps secret
-  ping-devops generate tls-secret {domain}              # TLS Cert/Key (i.e. example.com)
-  ping-devops generate ssh-id-secret {ssh id_rsa file}  # SSH ID Key (i.e. ~/.ssh/id_rsa)
-  ping-devops generate license {product}                # Eval license file for product
-  ping-devops generate license-secret {license file}    # License secret from license file
-  ping-devops generate kustomization.yaml               # Skeleton kustomization.yaml
-
-${GREEN}Running Docker/Kubernetes Evironments:${NORMAL}
-  ping-devops docker     [info|start|stop|rm|clean]
-  ping-devops kubernetes [info|start|rm|clean]  
-"
-
+  echo
+  echo "$USAGE_GENERAL"
+  echo
+  echo "$USAGE_GENERATE"
+  echo
+  echo "$USAGE_DOCKER_K8S_SUMMARY"
+  echo
+  echo "$USAGE_VAULT"
+  echo
   echo "$USAGE_FOOTER"
+  echo
+
   exit
 }
 
@@ -252,29 +288,24 @@ usage_command()
 
   echo_error "$*"
 
-  echo "$USAGE_HEADER
-################################################################################${NORMAL}
-"
+  echo "$USAGE_HEADER"
+  echo
 
   case "${_usageCmd}" in
+    generate)
+      echo "${USAGE_GENERATE}"
+      ;;
     docker)
-      echo "${GREEN}Running Docker Getting Started Containers:${NORMAL}
-  ping-devops docker info                      # Lists all available use-cases/products
-  ping-devops docker info  {product}           # Information on user-case/product
-  ping-devops docker start {product}           # Starts services  (i.e. docker-compose up)
-  ping-devops docker stop  {product}           # Stops services   (i.e. docker-compose stop)
-  ping-devops docker rm    {product}           # Removes services (i.e. docker-compose down)
-  ping-devops docker clean                     # Cleans all ping_devops docker services"
+      echo "${USAGE_DOCKER_DETAIL}"
       ;;
     kubernetes)
-      echo "${GREEN}Running Kubernetes Getting Started Containers:${NORMAL}
-  ping-devops kubernetes info                  # Lists all available use-cases/products
-  ping-devops kubernetes info  {product}       # Information on user-case/product
-  ping-devops kubernetes start {product}       # Starts services  (i.e. kubectl create)
-  ping-devops kubernetes rm    {product}       # Removes services (i.e. kubectl delete)
-  ping-devops kubernetes clean                 # Removes all ping_devops kubernetes resources"
+      echo "${USAGE_KUBERNETES_DETAIL}"
       ;;
-    *) usage
+    vault)
+      echo "${USAGE_VAULT}"
+      ;;
+    *)
+      usage
       ;;
   esac
 
@@ -319,7 +350,7 @@ find_setup_arg_value()
   _valToFind="${1}"
   _findFile="${2}"
   _defaultVal="${3}"
-  
+
   _valFound=$(grep "$_valToFind" "${_findFile}" | sed "s/.*$_valToFind \(.*\) .*\\\\$/\1/g")
 
   test -z "${_valFound}" && _valFound="${_defaultVal}"
@@ -350,7 +381,7 @@ add_bash_aliases()
 #                         Ping Identity DevOps Alias Files
 ################################################################################
 
-Let's add helper alias' and functions to your shell.  
+Let's add helper alias' and functions to your shell.
 We are assuming you use bash and will add these to your ${BASH_PROFILE}
 "
 
@@ -392,7 +423,7 @@ get_custom_variables()
 
         echo "${PING_DEVOPS_STANDARD_VARIABLES}" | grep "${_name}" >/dev/null
         _grepRC=$?
-        
+
         if test ${_grepRC} -ne 0; then
             echo "${_name}"
         fi
@@ -459,7 +490,7 @@ print_variable_setting_instructions()
 ################################################################################
 #  Setting Variables:
 #      [enter]     to accept current value
-#      [-]         to unset the value 
+#      [-]         to unset the value
 #      new value   to change value
 ################################################################################
   "
@@ -490,7 +521,7 @@ devops_add_config_custom()
 #      NAME=VALUE  to add that variable with setting (i.e. VERBOSE=true)
 ################################################################################
   "
-  
+
   while true
   do
       echo "Enter a new NAME=VALUE [enter to end] : \c"
@@ -570,6 +601,10 @@ echo "##########################################################################
     echo_info_variable PING_IDENTITY_DEVOPS_TAG
     echo
     echo_info_variable PING_IDENTITY_ACCEPT_EULA
+    echo
+    echo_info_variable VAULT_ADDR
+    echo_info_variable VAULT_CACERT
+    echo_info_variable VAULT_SECRET_PREFIX
 
 
 _listOfCustom_Variables=$(get_custom_variables)
@@ -600,7 +635,7 @@ fi
 
 echo "
 ################################################################################
- To change config, run: 
+ To change config, run:
     ping-devops config
 "
 }
@@ -631,7 +666,7 @@ ping_devops_version()
     _curl_result=$?
 
     test ${_curl_result} -ne 0 || test -z "${_latest_tool_version}" && _latest_tool_version="UNKNOWN"
-    
+
     if test "${_latest_tool_version}" = "${VERSION}" ||
        test "${_latest_tool_version}" = "UNKNOWN"; then
         _version_msg="${GREEN}${VERSION}${NORMAL} (no update required)"
@@ -665,6 +700,172 @@ ping_devops_clean()
 }
 
 ################################################################################
+# vault_get_token ()
+#
+# Hashicorp Vault get-token
+################################################################################
+vault_get_token()
+{
+    printf "Getting vault token..."
+
+    # _vaultCACRT="${TMP_DIR}/vault.ca.crt"
+    # kubectl get secrets vault-tls-secret -o jsonpath="{.data.vault\.crt}"|base64 --decode > "${_vaultCACRT}"
+
+    if test -n "${VAULT_CACERT}" && test -s "${VAULT_CACERT}" ; then
+      _vaultCACRT="${VAULT_CACERT}"
+    fi
+
+    kubectl get serviceaccount vault-auth 2>/dev/null >/dev/null
+    test $? -ne 0 && echo "Creating 'vauth-auth' serviceaccount" && kubectl create serviceaccount vault-auth
+
+    _k8sToken=$(kubectl get secrets -o jsonpath="{.items[?(@.metadata.annotations['kubernetes\.io/service-account\.name']=='vault-auth')].data.token}"|base64 --decode)
+
+
+    _vaultToken=$(${CURL} --request POST "${VAULT_ADDR}/v1/auth/kubernetes/login" \
+      $( test -s "${_vaultCACRT}" && echo "--cacert ${_vaultCACRT}" ) \
+      --header 'Content-Type: application/json' \
+      --data-raw "{\"jwt\":\"${_k8sToken}\",\"role\":\"k8s-default\"}" \
+      --fail 2>/dev/null | jq -r .auth.client_token)
+    _curl_result=$?
+
+    printf "\n\n"
+    vault login --address=${VAULT_ADDR} -format=table "${_vaultToken}"
+}
+
+################################################################################
+# vault_create_annotation ()
+#
+# Hashicorp Vault create_annotation
+################################################################################
+vault_create_annotation()
+{
+    local readonly secret="${1}"
+
+    vault kv get -format=json ${secret}  | jq '.data.data'> ${TMP_DIR}/vault.sec
+
+    _secretName=$(basename "${secret}")
+
+    case "${_secretName}" in
+        *.env)
+            cat >> "${TMP_DIR}/k8s.annotations" <<EOANNOTATION1
+    #
+    #------------ env: ${_secretName}
+    vault.hashicorp.com/agent-inject-secret-${_secretName}: "${secret}"
+    vault.hashicorp.com/agent-inject-template-${_secretName}: |
+      {{ with secret "${secret}" -}}
+EOANNOTATION1
+            for _secretKey in $(jq -r 'keys | .[]' ${TMP_DIR}/vault.sec); do
+                echo "      export ${_secretKey}=\"{{ .Data.data.${_secretKey} }}\"" >> "${TMP_DIR}/k8s.annotations"
+            done
+
+            cat >> "${TMP_DIR}/k8s.annotations" <<EOANNOTATION2
+      {{- end }}
+    #------------------------------------------------
+EOANNOTATION2
+            ;;
+        *)
+            for _secretKey in $(jq -r 'keys | .[]' ${TMP_DIR}/vault.sec); do
+                cat >> "${TMP_DIR}/k8s.annotations" <<EOANNOTATION3
+    #
+    #------------ key: ${_secretKey}
+    vault.hashicorp.com/agent-inject-secret-${_secretKey}: "${secret}"
+    vault.hashicorp.com/agent-inject-template-${_secretKey}: |
+      {{ with secret "${secret}" -}}
+      {{ .Data.data.${_secretKey} }}
+      {{- end }}
+    #------------------------------------------------
+EOANNOTATION3
+            done
+            ;;
+    esac
+}
+
+################################################################################
+# vault_create_annotations ()
+#
+# Hashicorp Vault create_annotations
+################################################################################
+vault_create_annotations()
+{
+  local readonly secretPath="${1}"
+
+  local readonly vresult=$( vault kv list -format=json ${secretPath})
+
+  if test -z "${vresult}" || test $? -ne 1; then
+    echo ""
+    echo_red "Error: Unable to make a call to vault.  Possibly your token has timed out."
+    echo_red "       Get a new token and re-run."
+    echo ""
+    echo "  ping-devops vault get-token"
+    return
+  fi
+
+  if test "${vresult}" = "{}" ; then
+    vault_create_annotation "${secretPath}"
+    return
+  fi
+
+  local readonly _firstRow=true
+  for secret in $(echo "${vresult}" | jq -r '.[]'); do
+    test "$_firstRow" = true \
+      && _firstRow=false \
+      && printf "    #\n    #-------- secret: %s\n" "${secretPath}" >> "${TMP_DIR}/k8s.annotations"
+
+    vault_create_annotations "${secretPath}${secret}"
+  done
+}
+
+################################################################################
+VAULT_ANNOTAION_PREAMBLE="
+  annotations:
+    #----------------------------------------------------
+    # Annotation secretes prepared for hashicorp vault secrets
+    # for use in Deployment, StatefulSet, Pod resources.
+    #
+    # https://www.vaultproject.io/docs/platform/k8s/injector/annotations
+    #
+    vault.hashicorp.com/agent-pre-populate-only: "true"
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/role: "k8s-default"
+    vault.hashicorp.com/log-level: "info"
+    vault.hashicorp.com/preserve-secret-case: "true"
+    #----------------------------------------------------"
+
+################################################################################
+# ping_devops_vault ()
+#
+# Hashicorp Vault CLI
+################################################################################
+ping_devops_vault()
+{
+    _cmd="${1}" && shift
+    _remainParams="${*}"
+
+    check_devops_file
+    #check_for_tool $VAULT
+    check_variables VAULT_ADDR
+
+    case "${_cmd}" in
+        get-token)
+            vault_get_token
+            ;;
+        create-annotations)
+            _secretPath="secret/${VAULT_SECRET_PREFIX}/${_remainParams}$(test -n "${_remainParams}" && printf "/")"
+
+            vault_create_annotations "${_secretPath}"
+
+            if test -s "${TMP_DIR}/k8s.annotations" ; then
+                echo "${VAULT_ANNOTAION_PREAMBLE}"
+                cat "${TMP_DIR}/k8s.annotations"
+            fi
+            ;;
+        *)
+            usage_command "vault" "Unknown vault option."
+            ;;
+    esac
+}
+
+################################################################################
 # print_topic
 #
 # topic - topic from pingidentity-devops-getting-started/docs/ping-devops/.
@@ -695,7 +896,7 @@ print_topic()
     jq -r < "${PING_DEVOPS_TOPICS_JSON}" "
       [ .[]
         # Map column names to data
-        | {              
+        | {
             Topic: .name
           }
       ]
@@ -706,7 +907,7 @@ print_topic()
       | (.[0] |keys_unsorted | @tsv)   # print header
       , (.[]|.|map(.) |@tsv)           # print data
       " | column -ts "$(printf '\t')"
-      
+
     echo
   else
     echo_green "
@@ -726,7 +927,7 @@ print_topic()
       echo
       echo "To get a list of topics:"
       echo_green "  ping-devops topic"
-      echo 
+      echo
       exit 1
     fi
 
@@ -751,8 +952,8 @@ generate_resource()
         devops-secret)
             check_variables \
                 PING_IDENTITY_DEVOPS_USER \
-                PING_IDENTITY_DEVOPS_KEY 
-                
+                PING_IDENTITY_DEVOPS_KEY
+
             check_for_tool $BASE64
 
             echo "
@@ -778,14 +979,14 @@ data:
             check_for_tool $BASE64
 
             test ! -f /etc/ssl/openssl.cnf && echo_error "Missing /etc/ssl/openssl.cnf" && exit
-            
+
             _opensslcnf="${TMP_DIR}/openssl.cnf"
             _tlsKey="${TMP_DIR}/tls.key"
             _tlsCrt="${TMP_DIR}/tls.crt"
 
             cat /etc/ssl/openssl.cnf > "${_opensslcnf}"
             printf "[SAN]\nsubjectAltName=DNS:*.%s" "${_domain} " >> "${_opensslcnf}"
-            
+
             $OPENSSL req -x509 -nodes -newkey rsa:2048 -days 3650 -sha256 \
               -out "${_tlsKey}" -keyout "${_tlsCrt}" \
               -subj "/CN=${_domain}" \
@@ -846,7 +1047,7 @@ EOK
             usage "generate" "Unknown resource to generate '${_secret}'"
             ;;
     esac
-} 
+}
 
 ################################################################################
 # generate_license_secret (command, name of product or license file)
@@ -864,7 +1065,7 @@ generate_license_secret()
           test ! -f "${_licenseArg}" && usage "Missing license file (i.e. /path/pingfederate.lic)"
           _licenseFile="${_licenseArg}"
           ;;
-      license)  
+      license)
           test -z "${_licenseArg}" && usage "Missing product name (i.e. pingfederate)"
           _licenseProd="${_licenseArg}"
           ;;
@@ -891,12 +1092,12 @@ data:
   else
     case "${_licenseProd}" in
       pingaccess|pingcentral|pingdatametrics|pingdatasync|pingdatagovernance|pingdatagovernancepap|pingdirectory|pingdirectoryproxy|pingfederate)
-         
+
         check_for_tool $DOCKER
 
         check_variables \
             PING_IDENTITY_DEVOPS_USER \
-            PING_IDENTITY_DEVOPS_KEY 
+            PING_IDENTITY_DEVOPS_KEY
 
         $DOCKER run --rm -v /tmp:/tmp "${PING_IDENTITY_DEVOPS_REGISTRY}/pingdownloader" \
           --product "${_licenseProd}" \
@@ -906,15 +1107,15 @@ data:
           --devops-app "pingdevops" >/dev/null 2>>/dev/null
         _dockerRunResult=$?
 
-        test $_dockerRunResult -ne 0 && usage "Unable to pull eval license (result=$_dockerRunResult)\nCheck that you can run 'docker version'\nCheck that your PING_IDENTITY_DEVOPS_USER and PING_IDENTITY_DEVOPS_USER are valid." 
-      
+        test $_dockerRunResult -ne 0 && usage "Unable to pull eval license (result=$_dockerRunResult)\nCheck that you can run 'docker version'\nCheck that your PING_IDENTITY_DEVOPS_USER and PING_IDENTITY_DEVOPS_USER are valid."
+
         cat /tmp/product.lic
         ;;
       *)
         usage "Invalid product name '${_licenseProd}'"
         ;;
     esac
-  fi  
+  fi
 }
 
 ################################################################################
@@ -925,7 +1126,7 @@ get_ping_devops_json()
 {
     # Get the ping-devops.json file
     _curl_result=0
-    
+
     ${CURL} -H "User-Agent: ping-devops" ${PING_DEVOPS_URL} \
               --output "${PING_DEVOPS_JSON}" \
               --fail 2>/dev/null
@@ -971,7 +1172,7 @@ print_orchestration_usecase()
 ################################################################################
 "
     jq -r < "${PING_DEVOPS_JSON}" "
-      [.${_orchestation}.usecases 
+      [.${_orchestation}.usecases
         | .[]
         # Map column names to data
         | {
@@ -1044,14 +1245,19 @@ orchestration_command()
 
             _orch_file="kustomization.yaml"
             ;;
-        *) 
+        vault)
+            check_for_tool $VAULT
+            check_variables \
+                VAULT_ADDR
+            ;;
+        *)
             usage "Unknown orchestration '${_orchestrator}'.";;
     esac
 
 
     # Get the .ping-devops.json file
     get_ping_devops_json
-    
+
     _docker_compose_project_name="ping_devops"
 
     #
@@ -1065,7 +1271,7 @@ orchestration_command()
         _info_base_url=$(jq -r < "${PING_DEVOPS_JSON}" ".baseURL" )
         _kust_base_url=$(jq -r < "${PING_DEVOPS_JSON}" ".baseKustomizeURL" )
         _usecase_path=$(jq -r < "${PING_DEVOPS_JSON}" ".${_orchestrator}.usecases[] | select ( [.name] == [\"${_product}\"]) | .path")
-        
+
         #
         # If we have a usecase path found, then we will create the URLs
         # to pull the information files as well as creating the options for
@@ -1087,7 +1293,7 @@ orchestration_command()
         else
           _curl_result=1
         fi
-        
+
         # If we can't find an orchestration file, then we will change the command to info
         # and provide a message that we can't download info for the product.
         if test ${_curl_result} -ne 0; then
@@ -1129,15 +1335,15 @@ orchestration_command()
                     ;;
                 kubernetes)
                     cd "${TMP_DIR}" || echo_red "Unable to change to temporary dir" || exit
-                    
+
                     run_command "ping-devops generate devops-secret" "devops-secret.yaml"
                     run_command "$KUBECTL apply -f devops-secret.yaml"
-                    
+
                     if test ! -z "${PING_IDENTITY_DEVOPS_DNS_ZONE}"; then
                         run_command "ping-devops generate tls-secret ${PING_IDENTITY_DEVOPS_DNS_ZONE}" "tls-secret.yaml"
                         run_command "$KUBECTL apply -f tls-secret.yaml"
                     fi
-                    
+
                     run_command "$KUSTOMIZE build ${_kust_url}" "kustomize_output.yaml"
                     mv kustomize_output.yaml before_envsubst.yaml
                     # shellcheck disable=SC2002
@@ -1150,13 +1356,13 @@ orchestration_command()
                     echo
                     grep "^#-" "${_orch_file}"
                     echo "#  Starting kubernetes deployment of '${_product}'
-#  
+#
 #     Kustomization URL: ${_kust_url}
 #    Kubernetes Context: ${GREEN}${CURRENT_K8S_CONTEXT}${NORMAL}
 #  Kubernetes Namespace: ${GREEN}${CURRENT_K8S_NAMESPACE}${NORMAL}
-# 
+#
 #  Additional kubectl Commands
-# 
+#
 #             List Containers - kubectl get all
 #    Watch Container/Pod Logs - kubectl logs {pod-name} -f
 #   Exec Shell Into Container - kubectl exec -it {pod-name} -- /bin/sh
@@ -1174,7 +1380,7 @@ orchestration_command()
                     ;;
                 kubernetes)
                     cd "${TMP_DIR}" || echo_red "Unable to change to temporary dir" || exit
-                    
+
                     run_command "$KUSTOMIZE build ${_kust_url}" "kustomize_output.yaml"
                     mv kustomize_output.yaml before_envsubst.yaml
                     # shellcheck disable=SC2002
@@ -1246,10 +1452,10 @@ orchestration_command()
                     echo "# "
                     echo "#    knuke"
                     echo "################################################################################"
-                    
+
                     ;;
             esac
-            
+
             echo "Cleaning/Removing ${_orch_dir}"
 
             rm -rf "${_orch_dir}"
@@ -1258,7 +1464,7 @@ orchestration_command()
             usage_command "${_orchestrator}" "Unknown ${_orchestrator} command"
             ;;
     esac
-    
+
 }
 
 ################################################################################
@@ -1283,7 +1489,7 @@ devops_config()
             echo "restoring: ${DEVOPS_FILE}"
             mv "${DEVOPS_FILE}".prev "${DEVOPS_FILE}"
             exit
-        ' HUP INT PIPE TERM 
+        ' HUP INT PIPE TERM
     fi
 
     echo "
@@ -1292,9 +1498,9 @@ devops_config()
 #
 #                     Welcome to Ping Identity DevOps!
 #
-#  We will run through a few config items to make your experiance as easy as 
+#  We will run through a few config items to make your experiance as easy as
 #  possible.  These include:
-#  
+#
 #    - Setting up your default '${PRINT_DEVOPS_FILE}' settings
 #    - Adding bash_profile.ping-devops to your .bash_profile, if neeeded
 #"
@@ -1302,7 +1508,7 @@ devops_config()
     echo "################################################################################
 #              Ping Identity DevOps Docker Variables
 ################################################################################
-# Variables used to assist docker tools and .yaml files during docker 
+# Variables used to assist docker tools and .yaml files during docker
 # container startups.
 ################################################################################
 " | tee -a "${DEVOPS_FILE}"
@@ -1318,9 +1524,20 @@ devops_config()
 
     echo "
 ################################################################################
+# Hashicorp Vault - If your kubernetes cluster is setup to use a vault from
+#                   Hashicorp, you may optionally provide a URL to that vault
+################################################################################
+" | tee -a "${DEVOPS_FILE}"
+
+    devops_add_config "${DEVOPS_FILE}" "VAULT_ADDR"                              "https://vault.example.com:8200"  "Hashicorp Vault Address"
+    devops_add_config "${DEVOPS_FILE}" "VAULT_CACERT"                            ""                                "File Location of Vault CA Cert (i.e. ~/.vault-ca-cert)"
+    devops_add_config "${DEVOPS_FILE}" "VAULT_SECRET_PREFIX"                     "${PING_IDENTITY_DEVOPS_USER}/${CURRENT_K8S_NAMESPACE}"  "Vault Secret Prefix"
+
+    echo "
+################################################################################
 #              Ping Identity DevOps Customized Variables
 ################################################################################
-# Additional variables that you would like to send to containers via 
+# Additional variables that you would like to send to containers via
 # docker-compose.yaml and kubernetes .yaml files.
 #
 # Examples include:
@@ -1337,7 +1554,7 @@ devops_config()
 ################################################################################
 " | tee -a "${DEVOPS_FILE}"
 
-    devops_add_config_custom "${DEVOPS_FILE}" "${_custom_variables}"   
+    devops_add_config_custom "${DEVOPS_FILE}" "${_custom_variables}"
 
     add_bash_aliases
 
@@ -1345,9 +1562,10 @@ devops_config()
 
 ################################################################################
 #
-#  To run some sample Docker images, get more details with:
+# To get these changes effective in your current shell, you should either:
 #
-#    ping-devops docker
+#    o Restart your Terminal Session (will source your ~/.bash_profile)
+#    o Source your ~/.bash_profile
 #
 ################################################################################
     "
@@ -1359,13 +1577,13 @@ devops_config()
 # Arguments
 #   ${1} -> The string to base-64 encode, or a file whose contents to base64-encode.
 ########################################################################################################################
-base64_no_newlines() 
+base64_no_newlines()
 {
   if test -f "${1}"; then
     # shellcheck disable=SC2002
     cat "${1}" | $BASE64 | tr -d '\r?\n'
   else
-    echo "${1}\c" | $BASE64 | tr -d '\r?\n'
+    printf "${1}" | $BASE64 | tr -d '\r?\n'
   fi
 }
 
@@ -1393,6 +1611,8 @@ case "${_ping_devops_command}" in
         _resource="${1}" && shift $(( $# > 0 ? 1 : 0 ))
         _params="${*}"
 
+        test -z "${_resource}" && usage_command "${_ping_devops_command}"
+
         generate_resource "${_resource}" "${_params}"
         ;;
 
@@ -1407,7 +1627,7 @@ case "${_ping_devops_command}" in
             info|start|stop|rm|clean)
                 orchestration_command "${_ping_devops_command}" "${_orch_cmd}" "${_product}" "${_params}"
                 ;;
-            *) 
+            *)
                 usage_command "${_ping_devops_command}" "Unknown ${_ping_devops_command} command '${_orch_cmd}'"
         esac
         ;;
@@ -1426,6 +1646,13 @@ case "${_ping_devops_command}" in
         _params="${*}"
 
         ping_devops_clean "${_params}"
+        ;;
+    vault)
+        _params="${*}"
+
+        test -z "${_params}" && usage_command "${_ping_devops_command}"
+
+        ping_devops_vault ${_params}
         ;;
     *)
         usage "Unknown ping-devops command '${_ping_devops_command}'"

@@ -22,7 +22,7 @@ if [[ ! "$TMP_DIR" || ! -d "$TMP_DIR" ]]; then
   exit 1
 fi
 
-function cleanup {      
+function cleanup {
   rm -rf "$TMP_DIR"
 }
 
@@ -50,10 +50,10 @@ echo "
 
     ${INSTALL_DIR}/ping-devops
     ${INSTALL_DIR}/bash_profile.ping-devops
-  
+
   It is recommended to:
     1. copy your 'ping-devops' to a location in your PATH (i.e. ~/bin or /usr/local/bin)
-    2. source the 'bash_profile.ping-devops' in your shell to get all the goodness 
+    2. source the 'bash_profile.ping-devops' in your shell to get all the goodness
        from Ping Identity DevOps!
     3. Ensure you have additional utilities used by ping-devops:
           jq
@@ -63,6 +63,7 @@ echo "
           base64
           kustomize
           kubectl
+          kubectx (includes kubens)
           envsubst
 
   Example:

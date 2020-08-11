@@ -13,9 +13,9 @@
 bold=$(tput bold)
 normal=$(tput sgr0)
 
-pdo() 
-{ 
-    run cd "${PING_IDENTITY_DEVOPS_HOME}/$*" 
+pdo()
+{
+    run cd "${PING_IDENTITY_DEVOPS_HOME}/$*"
 }
 
 alias pdog="pdo pingidentity-devops-getting-started"
@@ -24,7 +24,7 @@ alias pdos="pdo pingidentity-server-profiles"
 
 
 ## dhelp
-dhelp () 
+dhelp ()
 {
 cat <<EOHELP
 +----------------------------------------------------------------------------+
@@ -32,19 +32,19 @@ cat <<EOHELP
 +----------------------------------------------------------------------------+
  ${bold}Container${normal}                                 ${bold}Image${normal}
  -------------------------------------     ----------------------------------
- dce - execute commands (i.e. /bin/sh)     dib - build 
+ dce - execute commands (i.e. /bin/sh)     dib - build
  dci - inspect                             dii - inspect
- dcl - list                                dil - list 
+ dcl - list                                dil - list
  dcr - remove forcefully                   dir - remove forcefully
- dcp - prune                               dip - prune 
- dct - run top                             dit - tag 
+ dcp - prune                               dip - prune
+ dct - run top                             dit - tag
  dcstop  - stop                            diw - remove pingidentity images
- dcstart - start                            
+ dcstart - start
  dck    - stop
  dlogs  - tail logs
  dsa - docker stop all
- dra - docker remove all              
-                                          
+ dra - docker remove all
+
  ${bold}Volume${normal}                    ${bold}Network${normal}                   ${bold}Service${normal}
  ------------------------  ------------------------  ------------------------
  dvc - create              dnc - create              dsl - list
@@ -64,7 +64,7 @@ cat <<EOHELP
  ----------------------------------------------------------------------------
  ddc - deep clean (cont, vol, net)
  dnuke - deletes everything from local docker unused data
-      
+
  pingdownload - download product or license to ~/Downloads
  pdog - cd to 'pingidentity-devops-getting-started' directory
  pdob - cd to 'pingidentity-docker-builds' directory
@@ -74,7 +74,7 @@ EOHELP
 }
 
 ## denv
-denv () 
+denv ()
 {
   echo "
 denv alias has been deprecated. Please use:
@@ -98,8 +98,8 @@ alias pingdownload="run docker run --env-file ~/.pingidentity/devops --rm -v ~/D
 alias dps="run docker ps"
 
 # Stop all running containers
-dsa() 
-{ 
+dsa()
+{
   echo "Running command to: ${bold}Stop all running containers${normal}";
   if ! test -z $(docker container ls -a -q) ; then
     docker container stop $(docker container ls -a -q)
@@ -109,7 +109,7 @@ dsa()
 }
 
 # Remove all stopped containers
-dra() 
+dra()
 {
   echo "Running command to: ${bold}Remove all stopped containers${normal}";
   if ! test -z $(docker container ls -a -q) ; then
@@ -129,7 +129,7 @@ alias dck="dcstop"
 alias dcstart="run docker container start"
 alias dlogs="run docker logs -f"
 
-## image  
+## image
 alias dib="run docker image build"
 alias dii="run docker image inspect"
 alias dil="run docker images"
@@ -197,7 +197,7 @@ alias ddc="dcp ; dvp ; dip; dnp"
 alias dnuke="docker system prune -af"
 
 ## kenv
-kenv () 
+kenv ()
 {
   echo "
 kenv alias has been deprecated. Please use:
@@ -207,46 +207,46 @@ kenv alias has been deprecated. Please use:
 }
 
 ## khelp
-khelp () 
+khelp ()
 {
 cat <<EOHELP
 +----------------------------------------------------------------------------+
-|                   ${bold}Ping Identity DevOps Kubernetes Aliases${normal}                      |
+|                   ${bold}Ping Identity DevOps Kubernetes Aliases${normal}                  |
 +----------------------------------------------------------------------------+
  ${bold}k8s Information${normal}
  -------------------------------------
  kubectx - get kubernetes context info
  kubens - get kubernetes namespace info
 
- ${bold}General Info${normal}       
- ------------------------------------- 
- kall - get k8s objects in namespace  
+ ${bold}General Info${normal}
+ -------------------------------------
+ kall - get k8s objects in namespace
  kd, kdescribe - describe
- 
+
  ${bold}Get${normal}                                       ${bold}Describe${normal}
  -------------------------------------     ----------------------------------
  kg, kget - get {type}                     kd, kdescribe - describe {type}
  kgp - get pods                            kdp - describe pods
  kgs - get services                        kds - describe services
- kgi - get ingresses                       
+ kgi - get ingresses
  kgn - get nodes                           kdn - describe nodes
 
  ${bold}Pods${normal}                                      ${bold}Nodes${normal}
  -------------------------------------     ----------------------------------
- kpe - execute commands (i.e. /bin/sh)     
+ kpe - execute commands (i.e. /bin/sh)
  kpl - list                                knl - list
- klogs  - tail logs for a pod              
+ klogs  - tail logs for a pod
 
- ${bold}Delete${normal}                      
+ ${bold}Delete${normal}
  -------------------------------------
  knuke [option] - delete ${bold}all${normal} resources in a namespace, defaults to current namespace
-      
+
 
  ${bold}Kustomize${normal}
  ----------------------------------------------------------------------------
- kustcreate - kustomize build | envsubst | kubectl create 
- kustapply  - kustomize build | envsubst | kubectl apply 
- kustdelete - kustomize build | envsubst | kubectl delete 
+ kustcreate - kustomize build | envsubst | kubectl create
+ kustapply  - kustomize build | envsubst | kubectl apply
+ kustdelete - kustomize build | envsubst | kubectl delete
 
  ${bold}Special${normal}
  ----------------------------------------------------------------------------
@@ -257,7 +257,7 @@ EOHELP
 }
 
 #TODO: add:
-# kdelpo - delete all pods in namespace     
+# kdelpo - delete all pods in namespace
 # kdelall [option]- delete all [option] (pods, deployments, services) in namespace
 
 ## kubernetes
@@ -327,7 +327,7 @@ knuke() {
   if test "${nuke}" = "y" || test "${nuke}" = "yes"; then
     echo "${bold}deploy nuke${normal}";
     kubectl delete pods,configmaps,secrets,jobs,cronjobs,statefulsets,deployments,persistentvolumeclaims,services,ingresses -n "$(kubectl get sa default -o jsonpath='{.metadata.namespace}')" --grace-period=0 --force --all
-  else 
+  else
     echo "crisis averted"
   fi
 }
@@ -378,8 +378,116 @@ kdelall() {
   esac
 }
 
+
+VAULT_SECRET_PREFIX=${PING_IDENTITY_DEVOPS_USER}/$(kubens -c)
+
+## vhelp
+vhelp()
+{
+cat <<EOHELP
++----------------------------------------------------------------------------+
+|                   ${bold}Ping Identity DevOps Vault Aliases${normal}
+|
+|  Following variables can be set by 'ping-devops config'
+|
+|           VAULT_ADDR: ${VAULT_ADDR}
+|  VAULT_SECRET_PREFIX: ${VAULT_SECRET_PREFIX}
++----------------------------------------------------------------------------+
+ ${bold}Vault Tokens${normal}
+ ----------------------------------------------------------------------------
+ ping-devops vault get-token     # Gets a vault token for vault commands
+ vtoken                          # print current token info
+
+ ${bold}Secrets${normal} - Vault kv helper aliases
+ ----------------------------------------------------------------------------
+ vls     {secret}                      # Lists secrets (default: all secrets)
+ vget    {secret}                      # Gets secret
+ vput    {secret} name=val @data.json  # Creates or updates full secret
+ vpatch  {secret} name=val @data.json  # Updates/adds/remove name=vals from secret
+ vdelete {secret}                      # Deletes secret
+
+ Example:
+   ping-devops vault get-token         # Gets token
+   vput test-secret A=B C=D            # Creates test-secret with 2 name/val
+   vpatch test-secret E=F              # Adds name/val to test-secret
+   vget test-secret                    # Prints out test-secret name/val
+   vdelete test-secret                 # Deletes versions of test-secret
+ ----------------------------------------------------------------------------
+EOHELP
+}
+
+## vault
+v()
+{
+   _vaultParams="$*"
+
+   echo "Alias Expansion: ${bold}vault ${_vaultParams}${normal}"
+   echo "     VAULT_ADDR: ${bold}${VAULT_ADDR}${normal}"
+   echo "--------------------------------------"
+
+   # shellcheck disable=SC2086
+   vault $_vaultParams
+}
+
+alias vtoken="vault token lookup"
+
+vlist_all()
+{
+  local readonly secretPath="${1}"
+
+  vresult=$( vault kv list -format=json secret/$secretPath)
+
+  if test $? -ne 0; then
+    echo "${vresult}"
+  fi
+
+  for secret in $(echo "$vresult" | jq -r '.[]'); do
+    case "${secret}" in
+        */)
+            vlist_all "${secretPath}${secret}"
+            ;;
+        *)
+            echo "secret/${secretPath}${secret}"
+            ;;
+    esac
+  done
+}
+
+vls()
+{
+  echo "Alias Expansion: ${bold}vault kv list secret/${VAULT_SECRET_PREFIX}/${*}${normal}"
+  echo "     VAULT_ADDR: ${bold}${VAULT_ADDR}${normal}"
+  echo "--------------------------------------"
+
+  vlist_all ${VAULT_SECRET_PREFIX}/${*}
+}
+
+
+vget()
+{
+  v kv get secret/${VAULT_SECRET_PREFIX}/${*}
+}
+
+
+vput()
+{
+  v kv put secret/${VAULT_SECRET_PREFIX}/${*}
+}
+
+vpatch()
+{
+  v kv patch secret/${VAULT_SECRET_PREFIX}/${*}
+}
+
+vdelete()
+{
+  v kv delete secret/${VAULT_SECRET_PREFIX}/${*}
+}
+
+
+
 ## sourcePingIdentityFiles
-sourcePingIdentityFiles () 
+sourcePingIdentityFiles ()
 {
     set -a
     # shellcheck disable=SC1090
