@@ -54,7 +54,7 @@ PING_DEVOPS_STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.6.7"
+VERSION="0.6.8"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -824,11 +824,12 @@ VAULT_ANNOTAION_PREAMBLE="
     #
     # https://www.vaultproject.io/docs/platform/k8s/injector/annotations
     #
-    vault.hashicorp.com/agent-pre-populate-only: "true"
-    vault.hashicorp.com/agent-inject: "true"
-    vault.hashicorp.com/role: "k8s-default"
-    vault.hashicorp.com/log-level: "info"
-    vault.hashicorp.com/preserve-secret-case: "true"
+    vault.hashicorp.com/agent-pre-populate-only: \"true\"
+    vault.hashicorp.com/agent-inject: \"true\"
+    vault.hashicorp.com/role: \"k8s-default\"
+    vault.hashicorp.com/log-level: \"info\"
+    vault.hashicorp.com/preserve-secret-case: \"true\"
+    vault.hashicorp.com/secret-volume-path: \"/run/secrets\"
     #----------------------------------------------------"
 
 ################################################################################
