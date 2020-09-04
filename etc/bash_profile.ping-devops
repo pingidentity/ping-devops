@@ -378,9 +378,6 @@ kdelall() {
   esac
 }
 
-
-VAULT_SECRET_PREFIX=${PING_IDENTITY_DEVOPS_USER}/$(kubens -c)
-
 ## vhelp
 vhelp()
 {
