@@ -54,7 +54,7 @@ PING_DEVOPS_STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.6.8"
+VERSION="0.7.0"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -225,8 +225,9 @@ USAGE_GENERATE="${GREEN}Generate Kubernetes/Kustomize/License Resources:${NORMAL
   ping-devops generate devops-secret                    # Ping DevOps secret
   ping-devops generate tls-secret {domain}              # TLS Cert/Key (i.e. example.com)
   ping-devops generate ssh-id-secret {ssh id_rsa file}  # SSH ID Key (i.e. ~/.ssh/id_rsa)
-  ping-devops generate license {product}                # Eval license file for product
+  ping-devops generate license {product} {ver}          # Eval license file for product/ver
   ping-devops generate license-secret {license file}    # License secret from license file
+  ping-devops generate license-secret {product} {ver}   # License secret for product/ver
   ping-devops generate kustomization.yaml               # Skeleton kustomization.yaml"
 
 ################################################################################
@@ -1020,7 +1021,7 @@ data:
     $(base64_no_newlines "${_idKey}")"
             ;;
         license-secret|license)
-            generate_license_secret "${1}" "${2}"
+            generate_license_secret "${1}" "${2}" "${3}"
             ;;
 
         kustomization|kustomization.yaml)
@@ -1054,17 +1055,25 @@ EOK
 # generate_license_secret (command, name of product or license file)
 #
 # Generates a license secret for the passed license file or name of product
-#  - license_file or product_name
+#  - license {produtct-name} {product-version}
+#  - license-secret {file}
+#  - license-secret {product-name} {product-version}
 ################################################################################
 generate_license_secret()
 {
   _licenseType="${1}"
   _licenseArg="${2}"
+  _licenseVer="${3}"
 
   case "${_licenseType}" in
       license-secret)
-          test ! -f "${_licenseArg}" && usage "Missing license file (i.e. /path/pingfederate.lic)"
-          _licenseFile="${_licenseArg}"
+          if test -f "${_licenseArg}"; then
+              _licenseFile="${_licenseArg}"
+              _licenseSecretName="license-secret"
+          else
+              _licenseProd="${_licenseArg}"
+              _licenseSecretName="${_licenseProd}-secret"
+          fi
           ;;
       license)
           test -z "${_licenseArg}" && usage "Missing product name (i.e. pingfederate)"
@@ -1075,24 +1084,10 @@ generate_license_secret()
   esac
 
   #
-  # Creating a Kubernetes License-scret from a license file
-  #
-  if test ! -z "${_licenseFile}"; then
-    _licenseSecret=$(base64_no_newlines "${_licenseFile}")
-
-    echo "
-apiVersion: v1
-kind: Secret
-metadata:
-  name: license-secret
-data:
-  license: |
-    ${_licenseSecret}"
-  #
   # Getting an evaluation license based on product passed
-  else
+  if test -n "${_licenseProd}"; then
     case "${_licenseProd}" in
-      pingaccess|pingcentral|pingdatametrics|pingdatasync|pingdatagovernance|pingdatagovernancepap|pingdirectory|pingdirectoryproxy|pingfederate)
+      pingaccess|pingcentral|pingdatametrics|pingdatasync|pingdatagovernance|pingdatagovernancepap|pingdirectory|pingdirectoryproxy|pingfederate|pingintelligence)
 
         check_for_tool $DOCKER
 
@@ -1100,23 +1095,47 @@ data:
             PING_IDENTITY_DEVOPS_USER \
             PING_IDENTITY_DEVOPS_KEY
 
+        test -n "${_licenseVer}" && _downloadVer="--version ${_licenseVer}"
+
         $DOCKER run --rm -v /tmp:/tmp "${PING_IDENTITY_DEVOPS_REGISTRY}/pingdownloader" \
-          --product "${_licenseProd}" \
+          --product "${_licenseProd}" ${_downloadVer} \
           --license \
           --devops-user "${PING_IDENTITY_DEVOPS_USER}" \
           --devops-key "${PING_IDENTITY_DEVOPS_KEY}" \
           --devops-app "pingdevops" >/dev/null 2>>/dev/null
         _dockerRunResult=$?
 
-        test $_dockerRunResult -ne 0 && usage "Unable to pull eval license (result=$_dockerRunResult)\nCheck that you can run 'docker version'\nCheck that your PING_IDENTITY_DEVOPS_USER and PING_IDENTITY_DEVOPS_USER are valid."
+        test $_dockerRunResult -ne 0 && usage "Unable to pull eval license (result=$_dockerRunResult)\nCheck that you can run 'docker version'\nCheck that your PING_IDENTITY_DEVOPS_USER and PING_IDENTITY_DEVOPS_USER are valid.\nCheck your product version is valid, if you provided one."
 
-        cat /tmp/product.lic
+        _licenseFile="/tmp/product.lic"
+
         ;;
       *)
         usage "Invalid product name '${_licenseProd}'"
         ;;
     esac
   fi
+
+  case "${_licenseType}" in
+      license-secret)
+              _licenseSecret=$(base64_no_newlines "${_licenseFile}")
+
+              echo "
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${_licenseSecretName}
+  labels:
+    pingidentity.com/generated-by: ping-devops
+data:
+  license: |
+    ${_licenseSecret}"
+          ;;
+      license)
+          cat /tmp/product.lic
+          ;;
+  esac
+
 }
 
 ################################################################################
@@ -1614,7 +1633,7 @@ case "${_ping_devops_command}" in
 
         test -z "${_resource}" && usage_command "${_ping_devops_command}"
 
-        generate_resource "${_resource}" "${_params}"
+        generate_resource "${_resource}" ${_params}
         ;;
 
     docker|kubernetes)
