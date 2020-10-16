@@ -1069,10 +1069,10 @@ generate_license_secret()
       license-secret)
           if test -f "${_licenseArg}"; then
               _licenseFile="${_licenseArg}"
-              _licenseSecretName="license-secret"
+              _licenseSecretName="ping-license"
           else
               _licenseProd="${_licenseArg}"
-              _licenseSecretName="${_licenseProd}-secret"
+              _licenseSecretName="${_licenseProd}-license"
           fi
           ;;
       license)
