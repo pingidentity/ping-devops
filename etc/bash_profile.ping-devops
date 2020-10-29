@@ -403,7 +403,7 @@ cat <<EOHELP
  vpatch  {secret} name=val @data.json  # Updates/adds/remove name=vals from secret
  vdelete {secret}                      # Deletes secret
 
- Example:
+ Examples:
    ping-devops vault get-token         # Gets token
    vput test-secret A=B C=D            # Creates test-secret with 2 name/val
    vpatch test-secret E=F              # Adds name/val to test-secret
@@ -481,7 +481,79 @@ vdelete()
   v kv delete secret/${VAULT_SECRET_PREFIX}/${*}
 }
 
+## hhelp
+hhelp ()
+{
+cat <<EOHELP
++----------------------------------------------------------------------------+
+|                   ${bold}Ping Identity DevOps Helm Aliases${normal}                        |
++----------------------------------------------------------------------------+
 
+ ${bold}General Info${normal}                              ${bold}Chart Testing${normal}
+ -------------------------------------     ----------------------------------
+ hls - helm ls                             htest - helm dependency;
+ hi  - helm install                                helm install --dry-run
+ hup - helm upgrade
+ hu  - helm uninstall
+
+ h   - helm (incl k8s info)
+
+ Examples (Available Helm Repos):
+   h repo add ping-devops    https://helm.pingidentity.com/devops
+   h repo add ping-demos     https://helm.pingidentity.com/demos
+   h repo add ping-solutions https://helm.pingidentity.com/solutions
+
+   h search repo      # List available charts
+ ----------------------------------------------------------------------------
+
+
+EOHELP
+}
+
+## helm
+h()
+{
+   _helmParams="$*"
+
+   _kubeCTX=$(kubectl config current-context)
+   _kubeNS=$(kubectl config view --minify --output 'jsonpath={..namespace}')
+   _kubeNShelp=""
+
+   test "${_kubeNS}" = "default" && _kubeNShelp=" (to set, use kubens {namespace})"
+
+   while true; do
+      test -z "$1" && break
+      case "$1" in
+         -n|--namespace)
+            shift
+            _kubeNS="$1"
+            ;;
+         -A)
+            _kubeNS="ALL Namespaces"
+            ;;
+      esac
+      shift
+   done
+
+   echo "Alias Expansion: ${bold}helm ${_helmParams}${normal}"
+   echo "    k8s Context: ${bold}${_kubeCTX}${normal}"
+   echo "  k8s Namespace: ${bold}${_kubeNS}${normal}${_kubeNShelp}"
+   echo "--------------------------------------"
+
+   # shellcheck disable=SC2086
+   helm $_helmParams
+}
+
+alias hls="h ls"
+alias hi="h install"
+alias hup="h upgrade"
+alias hu="h uninstall"
+
+htest()
+{
+  h dependency update ${1}
+  h install test ${*} --dry-run
+}
 
 ## sourcePingIdentityFiles
 sourcePingIdentityFiles ()

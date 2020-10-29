@@ -54,7 +54,7 @@ PING_DEVOPS_STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.7.0"
+VERSION="0.7.1"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -954,7 +954,8 @@ generate_resource()
         devops-secret)
             check_variables \
                 PING_IDENTITY_DEVOPS_USER \
-                PING_IDENTITY_DEVOPS_KEY
+                PING_IDENTITY_DEVOPS_KEY \
+                PING_IDENTITY_ACCEPT_EULA
 
             check_for_tool $BASE64
 
@@ -970,6 +971,7 @@ type: Opaque
 data:
   PING_IDENTITY_DEVOPS_USER: $(base64_no_newlines "${PING_IDENTITY_DEVOPS_USER}")
   PING_IDENTITY_DEVOPS_KEY: $(base64_no_newlines "${PING_IDENTITY_DEVOPS_KEY}")
+  PING_IDENTITY_ACCEPT_EULA: $(base64_no_newlines "${PING_IDENTITY_ACCEPT_EULA}")
 "
             ;;
 
