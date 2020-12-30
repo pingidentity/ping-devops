@@ -54,7 +54,7 @@ PING_DEVOPS_STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.7.1"
+VERSION="0.7.2"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -204,7 +204,7 @@ check_variables()
 USAGE_HEADER="${GREEN}################################################################################
 #  Ping Identity DevOps (version $VERSION)
 #
-#  Documentation: https://pingidentity-devops.gitbook.io/devops/
+#  Documentation: https://devops.pingidentity.com
 #   GitHub Repos: https://github.com/topics/ping-devops
 ################################################################################${NORMAL}"
 
@@ -1007,8 +1007,8 @@ metadata:
     ping-devops.dns-zone: ${_domain}
     ping-devops.app-version: v${VERSION}
 data:
-  tls.crt: $(base64_no_newlines "${_tlsKey}")
-  tls.key: $(base64_no_newlines "${_tlsCrt}")"
+  tls.crt: $(base64_no_newlines "${_tlsCrt}")
+  tls.key: $(base64_no_newlines "${_tlsKey}")"
             ;;
         ssh-id-secret)
             _idKey="${2}"
