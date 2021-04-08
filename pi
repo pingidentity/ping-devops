@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 ########################################################################################################################
 #
-# This script is used to manage a Ping Identity DevOps environment for Docker, Docerk Compose and Kubernetes.
+# This script is used to manage a Ping Identity environment for PingOne Docker and Kubernetes.
 #
 # ------------
 # Installation
@@ -59,7 +59,7 @@ STANDARD_VARIABLES="
 ################################################################################
 # Version Info
 ################################################################################
-VERSION="0.7.3"
+VERSION="1.0.0"
 
 ################################################################################
 # Ping Identity tools & config information
@@ -207,7 +207,7 @@ check_variables()
 
 ################################################################################
 USAGE_HEADER="${GREEN}################################################################################
-#  Ping Identity DevOps (version $VERSION)
+#  Ping Identity (pi) Command Line (version $VERSION)
 #
 #  Documentation: https://devops.pingidentity.com
 #   GitHub Repos: https://github.com/topics/ping-devops
@@ -219,7 +219,7 @@ USAGE_FOOTER="${GREEN}Further help:${NORMAL}
 
 ################################################################################
 USAGE_GENERAL="${GREEN}General Usage:${NORMAL}
-  ${PI_CMD} config                            # Configure Ping DevOps
+  ${PI_CMD} config                            # Configure pi
   ${PI_CMD} info [-v]                         # Print Config Information
   ${PI_CMD} version                           # Version Details and Check
   ${PI_CMD} clean                             # Remove ~/.pingidentity/${PI_CMD}
@@ -249,11 +249,16 @@ USAGE_PINGONE_SUMMARY="${GREEN}Manage PingOne Evironments:${NORMAL}
 USAGE_PINGONE_DETAIL="${GREEN}Manage PingOne Evironments:${NORMAL}
   ${PI_CMD} pingone list [users | groups | populations ]                # List objects
 
-  ${PI_CMD} pingone create user {population} {username} {first} {last}  # Create user
-  ${PI_CMD} pingone create group {population} {name}                    # Create group
-  ${PI_CMD} pingone create population {name}                            # Create population
+  ${PI_CMD} pingone get [user | group ] {username | name}               # List object
 
-  ${PI_CMD} pingone add-user-group population {username} {g1} ... {gN}  # Add groups to user"
+  ${PI_CMD} pingone add user  {population} {username} {first} {last}    # Create user
+  ${PI_CMD} pingone add group {population} {name}                       # Create group
+  ${PI_CMD} pingone add population {name}                               # Create population
+
+  ${PI_CMD} pingone delete user  {username}                             # Delete user
+  ${PI_CMD} pingone delete group {name}                                 # Delete group
+
+  ${PI_CMD} pingone add-user-group {username} {g1} ... {gN}             # Add groups to user"
 
 ################################################################################
 USAGE_DOCKER_K8S_SUMMARY="${GREEN}Running Docker/Kubernetes Evironments:${NORMAL}
@@ -409,7 +414,7 @@ add_bash_aliases()
     if test "${?}" = "1"; then
         echo "
 ################################################################################
-#                         Ping Identity DevOps Alias Files
+#                         Ping Identity Alias Files
 ################################################################################
 
 Let's add helper alias' and functions to your shell.
@@ -421,7 +426,7 @@ We are assuming you use bash and will add these to your ${BASH_PROFILE}
 
         if [ "${answer}" = "" ] || [ "${answer}" = "Y" ] || [ "${answer}" = "y" ]; then
             echo "
-# Ping Identity DevOps Aliases - Added with '${PI_CMD} config' on $(date)
+# Ping Identity Aliases - Added with '${PI_CMD} config' on $(date)
 test -f '${PING_DEVOPS_BASH_PROFILE}' && source '${PING_DEVOPS_BASH_PROFILE}'" >> "${BASH_PROFILE}"
         fi
     fi
@@ -931,7 +936,7 @@ print_topic()
   if test -z "${_topic}"; then
     echo_green "
 ################################################################################
-#          Ping Identity DevOps Topics
+#          Ping Identity Topics
 ################################################################################
 "
     # Print the TOPICS_JSON (which comes from github) as a table
@@ -954,7 +959,7 @@ print_topic()
   else
     echo_green "
 ################################################################################
-#          Ping Identity DevOps Topic: ${_topic}
+#          Ping Identity Topic: ${_topic}
 ################################################################################
 "
     # Pull the topic from the topics location
@@ -1558,7 +1563,7 @@ devops_config()
 
 ################################################################################
 #
-#                     Welcome to Ping Identity DevOps!
+#                     Welcome to Ping Identity Command Line Tool!
 #
 #  We will run through a few config items to make your experiance as easy as
 #  possible.  These include:
@@ -1567,18 +1572,22 @@ devops_config()
 #    - Adding bash_profile.${PI_CMD} to your .bash_profile, if neeeded
 #"
 
+    print_variable_setting_instructions
+
     echo "################################################################################
-#              Ping Identity Variables
-################################################################################
-# Variables used to assist pingone and devops operations
+# Variables used to assist pingone operations
 ################################################################################
 " | tee -a "${CONFIG_FILE}"
 
-    print_variable_setting_instructions
 
     add_config "${CONFIG_FILE}" "PINGONE_ENVIRONMENT_ID"                 "" "PingOne Environment ID"
     add_config "${CONFIG_FILE}" "PINGONE_WORKER_APP_CLIENT_ID"           "" "PingOne Worker App Client ID"
     add_config "${CONFIG_FILE}" "PINGONE_WORKER_APP_CLIENT_SECRET"       "" "PingOne Worker App Client Secret"
+
+echo "################################################################################
+# Variables used to assist devops operations
+################################################################################
+" | tee -a "${CONFIG_FILE}"
 
     add_config "${CONFIG_FILE}" "PING_IDENTITY_ACCEPT_EULA"               "NO" "Do you accept the terms of license (found here: https://www.pingidentity.com/en/legal/subscription-agreement.html) with Ping Identity? (YES/NO)"
     add_config "${CONFIG_FILE}" "PING_IDENTITY_DEVOPS_USER"               ""                        "Ping Identity DevOps User (request here: https://bit.ly/ping-devops-request)"
@@ -1600,7 +1609,7 @@ devops_config()
 
     echo "
 ################################################################################
-#              Ping Identity DevOps Customized Variables
+#              Ping Identity Customized Variables
 ################################################################################
 # Additional variables that you would like to send to containers via
 # docker-compose.yaml and kubernetes .yaml files.
@@ -1671,59 +1680,7 @@ getPingOneAccessToken ()
     PINGONE_ACCESS_TOKEN=$(jq --raw-output '.access_token'  <<<"${_auth_response}")
 }
 
-################################################################################
-# pingone_list_users
-################################################################################
-pingone_list_users ()
-{
-  _json_response=$(curl --silent --location -g --request GET "https://api.pingone.com/v1/environments/${PINGONE_ENVIRONMENT_ID}/users${_param}" \
-      --header 'Content-Type: application/json' \
-      --header "Authorization: Bearer ${PINGONE_ACCESS_TOKEN}")
 
-  echo "${_json_response}" | jq -r ._embedded.users[].username
-}
-
-
-################################################################################
-# pingone_list_groups
-################################################################################
-pingone_list_groups ()
-{
-  _json_response=$(curl --silent --location -g --request GET "https://api.pingone.com/v1/environments/${PINGONE_ENVIRONMENT_ID}/groups${_param}" \
-      --header 'Content-Type: application/json' \
-      --header "Authorization: Bearer ${PINGONE_ACCESS_TOKEN}")
-
-  echo "${_json_response}" | jq -r ._embedded.groups[].name
-}
-
-
-################################################################################
-# pingone_get_user
-################################################################################
-pingone_get_user ()
-{
-  _username="${1}"
-
-  echo "Getting ${_username}"
-  _users_response=$(_getPingOneUsers "?filter=username%20eq%20%22${_username}%22" )
-
-  USER_ID=$(jq -r ._embedded.users[].id <<<"${_users_response}")
-  FIRST_NAME=$(jq -r ._embedded.users[].name.given <<<"${_users_response}")
-  LAST_NAME=$(jq -r ._embedded.users[].name.family <<<"${_users_response}")
-  #jq -r . <<<"${_users_response}"
-
-  _groups_response=$(_getPingOneUsers "/${USER_ID}/memberOfGroups" )
-
-  USER_GROUPS=$(jq -r ._embedded.groupMemberships[].name <<<"${_groups_response}")
-
-  echo "
-       Username: ${_username}
-      FirstName: ${FIRST_NAME}
-       LastName: ${LAST_NAME}
-
-         Groups: ${USER_GROUPS}
-  "
-}
 
 ################################################################################
 # getPingoneUserGroups
@@ -1740,7 +1697,48 @@ getPingOneUserGroups ()
   jq -r ._embedded.groupMemberships[].name <<<"${_users_response}"
 }
 
+###############################################################################
+# cat_indent (file)
+#
+# cat a file to stdout and indent 4 spaces
+###############################################################################
+cat_indent ()
+{
+    test -f "${1}" && sed 's/^/    /' < "${1}"
+}
 
+################################################################################
+# print_json_field
+################################################################################
+print_json_field()
+{
+    _json_data="${1}" && shift
+    test -z "${_json_data}" && return
+
+    jq -r "${_json_data}" <<<"${PINGONE_CALL_RESPONSE}"
+}
+
+################################################################################
+# print_json_fields
+################################################################################
+print_json_fields()
+{
+  _json_data="${1}" && shift
+  _jq_fields=""
+  _comma=""
+
+  while true
+  do
+    _label="${1}" && shift
+    test -z "${_label}" && break
+    _field="${1}" && shift
+    _jq_fields="${_jq_fields}${_comma}\"${_label}\", ${_field}, \"\\n\""
+    _comma=","
+  done
+
+  jq -jr "._embedded.users[] |
+    ${_jq_fields}" <<<"${PINGONE_CALL_RESPONSE}"
+}
 
 ################################################################################
 # print_json_table
@@ -1749,15 +1747,18 @@ print_json_table()
 {
   _json_data="${1}" && shift
   _sort_column="${1}" && shift
+  _tableColumns=""
+  _comma=""
+
   while true
   do
     _column="${1}" && shift
-    test -z ${_column} && break
+    test -z "${_column}" && break
     _tableColumns="${_tableColumns}${_comma}${_column}"
     _comma=","
   done
 
-  echo "${_json_response}" | jq -r "
+  echo "${PINGONE_CALL_RESPONSE}" | jq -r "
     ${_json_data}
     | [sort_by(${_sort_column}) | .[]
     |
@@ -1774,6 +1775,16 @@ print_json_table()
 }
 
 ################################################################################
+# pingone_call
+################################################################################
+pingone_call()
+{
+    PINGONE_CALL_RESPONSE=$(curl --silent --location -g --request GET "https://api.pingone.com/v1/environments/${PINGONE_ENVIRONMENT_ID}/${1}" \
+                --header 'Content-Type: application/json' \
+                --header "Authorization: Bearer ${PINGONE_ACCESS_TOKEN}")
+}
+
+################################################################################
 # pingone_list
 ################################################################################
 pingone_list()
@@ -1784,9 +1795,7 @@ pingone_list()
 
   case "${_resource}" in
       users)
-            _json_response=$(curl --silent --location -g --request GET "https://api.pingone.com/v1/environments/${PINGONE_ENVIRONMENT_ID}/users" \
-                --header 'Content-Type: application/json' \
-                --header "Authorization: Bearer ${PINGONE_ACCESS_TOKEN}")
+            pingone_call "users"
 
             print_json_table "._embedded.users" \
               ".username" \
@@ -1796,9 +1805,7 @@ pingone_list()
               "POPULATION:.population.id" \
           ;;
       groups)
-            _json_response=$(curl --silent --location -g --request GET "https://api.pingone.com/v1/environments/${PINGONE_ENVIRONMENT_ID}/groups" \
-                --header 'Content-Type: application/json' \
-                --header "Authorization: Bearer ${PINGONE_ACCESS_TOKEN}")
+            pingone_call "groups"
 
             print_json_table "._embedded.groups" \
               ".name" \
@@ -1806,9 +1813,7 @@ pingone_list()
               "NAME:.name"
           ;;
       populations)
-            _json_response=$(curl --silent --location -g --request GET "https://api.pingone.com/v1/environments/${PINGONE_ENVIRONMENT_ID}/populations" \
-                --header 'Content-Type: application/json' \
-                --header "Authorization: Bearer ${PINGONE_ACCESS_TOKEN}")
+            pingone_call "populations"
 
             print_json_table "._embedded.populations" \
               ".name" \
@@ -1816,10 +1821,123 @@ pingone_list()
               "NAME:.name"
           ;;
       *)
+          usage_command "pingone"
+          ;;
   esac
 
 
 }
+
+################################################################################
+# pingone_get
+################################################################################
+pingone_get ()
+{
+  _resource="${1}" && shift $(( $# > 0 ? 1 : 0 ))
+  test -z "${_resource}" && usage_command "pingone"
+  _params="${*}"
+
+  case "${_resource}" in
+      user)
+          _username="${1}" && shift
+          test -z "${_resource}" && usage_command "pingone"
+
+          pingone_call "users?filter=username%20eq%20%22${_username}%22"
+
+          print_json_fields "._embedded.users[]" \
+            "Username: " ".username" \
+            "   First: " ".name.given" \
+            "    Last: " ".name.family"
+
+          _user_id=$(jq -r ._embedded.users[].id <<<"${PINGONE_CALL_RESPONSE}")
+
+          echo "  Groups: "
+
+          pingone_call "users/${_user_id}/memberOfGroups"
+
+          print_json_field "._embedded.groupMemberships[].name"
+          ;;
+      group)
+          _name="${1}" && shift
+          test -z "${_resource}" && usage_command "pingone"
+
+          pingone_call "groups?filter=name%20eq%20%22${_name}%22"
+
+          jq -jr '._embedded.groups[] |
+            "Group Name: ", .name, "\n"' <<<"${PINGONE_CALL_RESPONSE}"
+
+          echo "     Users: "
+
+          _group_id=$(jq -r ._embedded.groups[].id <<<"${PINGONE_CALL_RESPONSE}")
+
+          pingone_call "users?filter=memberOfGroups[id%20eq%20%22${_group_id}%22]"
+
+          print_json_field "._embedded.users[].username"
+          ;;
+      *)
+          usage_command "pingone"
+          ;;
+  esac
+}
+
+
+################################################################################
+# pingone_add
+################################################################################
+pingone_add()
+{
+  _resource="${1}" && shift $(( $# > 0 ? 1 : 0 ))
+  test -z "${_resource}" && usage_command "pingone"
+  _params="${*}"
+
+  case "${_resource}" in
+      user)
+          _username="${1}" && shift
+          test -z "${_resource}" && usage_command "pingone"
+
+          echo "Add User - Not Implemented Yet"
+          ;;
+      group)
+          _username="${1}" && shift
+          test -z "${_resource}" && usage_command "pingone"
+
+          echo "Add Group - Not Implemented Yet"
+          ;;
+      *)
+          usage_command "pingone"
+          ;;
+  esac
+}
+
+
+################################################################################
+# pingone_delete
+################################################################################
+pingone_delete()
+{
+  _resource="${1}" && shift $(( $# > 0 ? 1 : 0 ))
+  test -z "${_resource}" && usage_command "pingone"
+  _params="${*}"
+
+  case "${_resource}" in
+      user)
+          _username="${1}" && shift
+          test -z "${_resource}" && usage_command "pingone"
+
+          echo "Delete User - Not Implemented Yet"
+          ;;
+      group)
+          _username="${1}" && shift
+          test -z "${_resource}" && usage_command "pingone"
+
+          echo "Delete Group - Not Implemented Yet"
+          ;;
+      *)
+          usage_command "pingone"
+          ;;
+  esac
+}
+
 
 ################################################################################
 # pingone_command
@@ -1838,6 +1956,12 @@ pingone_command()
           ;;
       get)
           pingone_get ${*}
+          ;;
+      add)
+          pingone_add ${*}
+          ;;
+      delete)
+          pingone_delete ${*}
           ;;
       *)
           usage "Unknown ${PI_CMD} command 'pingone ${_pingone_command}'"
