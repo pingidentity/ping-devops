@@ -1877,7 +1877,7 @@ pingone_get ()
           _username="${1}" && shift
           test -z "${_username}" && usage_command "pingone"
 
-          pingone_get_call "users" "filter=username%20eq%20%22${_username}%22"
+          pingone_get_call "users" "filter=username eq \"${_username}\""
 
           print_json_fields "._embedded.users[]" \
             "Username: " ".username" \
